@@ -31,6 +31,8 @@ import {
 import type { FeatureCollection, Point } from "geojson";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { installMapResumeHandler } from "@/lib/map-resume.mjs";
+
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 type CrowdLevel = "Low" | "Moderate" | "High";
@@ -233,6 +235,7 @@ export function MapExperience() {
     });
 
     mapRef.current = map;
+    const cleanupMapResume = installMapResumeHandler(map);
     map.addControl(new NavigationControl({ showCompass: true }), "bottom-right");
     map.addControl(new AttributionControl({ compact: false }), "bottom-right");
     map.on("error", () => setMapNotice("Map unavailable. Check your connection and reload."));
@@ -387,6 +390,7 @@ export function MapExperience() {
     });
 
     return () => {
+      cleanupMapResume();
       markerRefs.current.forEach((marker) => marker.remove());
       markerRefs.current = [];
       map.remove();
@@ -655,13 +659,14 @@ export function MapExperience() {
               <span><Clock3 size={15} /> {selected.wait}</span>
             </div>
             <div className="detail-actions">
-              <button
+              <a
                 className="directions-action"
-                type="button"
-                onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${selected.coordinates[1]},${selected.coordinates[0]}`, "_blank")}
+                href={`https://www.google.com/maps/dir/?api=1&destination=${selected.coordinates[1]},${selected.coordinates[0]}`}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 <Navigation size={17} /> Directions <ArrowUpRight size={16} />
-              </button>
+              </a>
               <button className="crowd-action" type="button" onClick={() => setCrowdOpen(true)}>Update crowd</button>
             </div>
           </div>
