@@ -14,11 +14,7 @@ function createPageTargets() {
 test("refreshes the map when returning from external navigation", () => {
   const { page, document } = createPageTargets();
   const calls = [];
-  const map = {
-    resize: () => calls.push("resize"),
-    triggerRepaint: () => calls.push("repaint"),
-  };
-  const cleanup = installMapResumeHandler(map, page);
+  const cleanup = installMapResumeHandler(() => calls.push("refresh"), page);
 
   page.dispatchEvent(new Event("pageshow"));
   assert.deepEqual(calls, []);
@@ -26,9 +22,9 @@ test("refreshes the map when returning from external navigation", () => {
   document.visibilityState = "visible";
   page.dispatchEvent(new Event("pageshow"));
   document.dispatchEvent(new Event("visibilitychange"));
-  assert.deepEqual(calls, ["resize", "repaint", "resize", "repaint"]);
+  assert.deepEqual(calls, ["refresh", "refresh"]);
 
   cleanup();
   page.dispatchEvent(new Event("pageshow"));
-  assert.deepEqual(calls, ["resize", "repaint", "resize", "repaint"]);
+  assert.deepEqual(calls, ["refresh", "refresh"]);
 });
