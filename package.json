@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prebuild": "node ./scripts/copy-maplibre-worker.mjs",
+    "predev": "node ./scripts/copy-maplibre-worker.mjs",
     "start": "next start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

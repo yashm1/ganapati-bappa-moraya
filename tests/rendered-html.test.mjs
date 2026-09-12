@@ -42,6 +42,11 @@ test("server-renders the Bappa Map product", async () => {
   assert.match(html, /Explore pandals/);
   assert.match(html, /Lalbaugcha Raja/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+
+  const workerResponse = await fetch(`http://127.0.0.1:${port}/maplibre/maplibre-gl-worker.mjs`);
+  const sharedWorkerResponse = await fetch(`http://127.0.0.1:${port}/maplibre/maplibre-gl-shared.mjs`);
+  assert.equal(workerResponse.status, 200);
+  assert.equal(sharedWorkerResponse.status, 200);
 });
 
 test("ships map, persistence, and upload capabilities without starter residue", async () => {
@@ -59,10 +64,13 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.doesNotMatch(mapExperience, /Visarjan routes|visarjan-routes|immersion-points/);
   assert.match(mapExperience, /api\/pandals/);
   assert.match(mapExperience, /result\.pandals/);
+  assert.match(mapExperience, /setWorkerUrl\("\/maplibre\/maplibre-gl-worker\.mjs"\)/);
   assert.match(vercelConfig, /"buildCommand": "npm run vercel-build"/);
   assert.match(workflow, /vercel deploy --yes/);
   assert.doesNotMatch(workflow, /vercel deploy --prebuilt/);
   assert.match(packageJson, /"db:migrate": "drizzle-kit migrate"/);
   assert.match(packageJson, /"maplibre-gl"/);
+  assert.match(packageJson, /"prebuild": "node \.\/scripts\/copy-maplibre-worker\.mjs"/);
+  assert.match(packageJson, /"predev": "node \.\/scripts\/copy-maplibre-worker\.mjs"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });

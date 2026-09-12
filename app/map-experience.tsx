@@ -22,6 +22,7 @@ import confetti from "canvas-confetti";
 import {
   AttributionControl,
   LngLatBounds,
+  setWorkerUrl,
   type GeoJSONSource,
   Map as MapLibreMap,
   Marker,
@@ -29,6 +30,8 @@ import {
 } from "maplibre-gl";
 import type { FeatureCollection, Point } from "geojson";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 type CrowdLevel = "Low" | "Moderate" | "High";
 
