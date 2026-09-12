@@ -68,9 +68,13 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.doesNotMatch(mapExperience, /Visarjan routes|visarjan-routes|immersion-points/);
   assert.match(mapExperience, /api\/pandals/);
   assert.match(mapExperience, /result\.pandals/);
+  assert.match(mapExperience, /waiting for approval/);
   assert.match(mapExperience, /setWorkerUrl\("\/maplibre\/maplibre-gl-worker\.mjs"\)/);
   assert.match(mapExperience, /styles\/bright/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
+  assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);
+  assert.match(pandalRoute, /Photo storage is not configured/);
+  assert.match(pandalRoute, /Database is not configured/);
   assert.match(adminPage, /Approve community pandals/);
   assert.match(adminPage, /x-pandal-admin-key/);
   assert.match(adminRoute, /eq\(pandals\.status, "pending"\)/);

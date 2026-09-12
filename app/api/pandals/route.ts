@@ -59,17 +59,38 @@ export async function POST(request: Request) {
   if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
     return Response.json({ error: "The captured location is not valid" }, { status: 400 });
   }
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return Response.json(
+      { error: "Photo storage is not configured. Add BLOB_READ_WRITE_TOKEN in Vercel and .env.local." },
+      { status: 503 },
+    );
+  }
+  if (!process.env.DATABASE_URL) {
+    return Response.json(
+      { error: "Database is not configured. Add DATABASE_URL in Vercel and .env.local." },
+      { status: 503 },
+    );
+  }
 
   const id = crypto.randomUUID();
   const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
   const imageKey = `pandals/${id}.${extension}`;
 
-  const blob = await put(imageKey, photo, {
-    access: "public",
-    addRandomSuffix: false,
-    contentType: photo.type,
-    cacheControlMaxAge: 31536000,
-  });
+  let imageUrl: string;
+  try {
+    const blob = await put(imageKey, photo, {
+      access: "public",
+      addRandomSuffix: false,
+      contentType: photo.type,
+      cacheControlMaxAge: 31536000,
+    });
+    imageUrl = blob.url;
+  } catch {
+    return Response.json(
+      { error: "Photo storage upload failed. Verify BLOB_READ_WRITE_TOKEN and the Vercel Blob store." },
+      { status: 503 },
+    );
+  }
 
   try {
     await getDb().insert(pandals).values({
@@ -79,15 +100,18 @@ export async function POST(request: Request) {
       longitude,
       latitude,
       imageKey,
-      imageUrl: blob.url,
+      imageUrl,
       eco,
       crowd,
       status: "pending",
       createdAt: Date.now(),
     });
-  } catch (error) {
-    await del(blob.url).catch(() => undefined);
-    throw error;
+  } catch {
+    await del(imageUrl).catch(() => undefined);
+    return Response.json(
+      { error: "Database save failed. Verify DATABASE_URL and run the Drizzle migrations." },
+      { status: 503 },
+    );
   }
 
   return Response.json({
@@ -96,7 +120,7 @@ export async function POST(request: Request) {
       name,
       area,
       coordinates: [longitude, latitude],
-      image: blob.url,
+      image: imageUrl,
       crowd,
       wait: crowd === "Low" ? "5-10 min" : crowd === "High" ? "45+ min" : "20-30 min",
       eco,

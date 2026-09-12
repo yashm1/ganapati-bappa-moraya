@@ -504,12 +504,20 @@ export function MapExperience() {
 
     try {
       const response = await fetch("/api/pandals", { method: "POST", body: formData });
-      const result = (await response.json().catch(() => null)) as { pandal?: Pandal; error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { pandal?: Pandal; status?: string; error?: string } | null;
       if (!response.ok || !result?.pandal) {
-        setUploadError(result?.error ?? "We could not add this pandal. Please check the details and try again.");
+        setUploadError(result?.error ?? `We could not add this pandal (error ${response.status}). Please try again.`);
         return;
       }
       const newPandal = result.pandal;
+      if (result.status === "pending") {
+        setUploadOpen(false);
+        setUploadPreview(null);
+        setUploadLocation(null);
+        setMapNotice("Thanks! Your pandal is waiting for approval before it appears on the map.");
+        form.reset();
+        return;
+      }
       setPandals((items) => [newPandal, ...items]);
       setSelected(newPandal);
       setUploadOpen(false);
