@@ -67,6 +67,9 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /waiting for approval/);
   assert.match(mapExperience, /loadGoogleMaps/);
   assert.match(mapExperience, /installMapResumeHandler/);
+  assert.match(mapExperience, /mobile-action-dock/);
+  assert.match(mapExperience, /GOOGLE_MAP_STYLES/);
+  assert.match(mapExperience, /compactViewport \? 40 : 50/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
   assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);
   assert.match(pandalRoute, /Photo storage is not configured/);

@@ -156,6 +156,24 @@ const crowdClass: Record<CrowdLevel, string> = {
   High: "crowd-high",
 };
 
+const GOOGLE_MAP_STYLES = [
+  { elementType: "geometry", stylers: [{ color: "#f7ead7" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#4e3d50" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#fffaf1" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#d6b9a5" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#f4d9e7" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#a9dda0" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#356b4a" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#fff8dd" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#ffd08a" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#f7a66a" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#e78758" }] },
+  { featureType: "transit.line", elementType: "geometry", stylers: [{ color: "#b886bd" }] },
+  { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#f4bd55" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#78d1df" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#246b78" }] },
+];
+
 export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
@@ -175,6 +193,15 @@ export function MapExperience() {
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [compactViewport, setCompactViewport] = useState(false);
+
+  useEffect(() => {
+    const viewport = window.matchMedia("(max-width: 767px)");
+    const updateViewport = () => setCompactViewport(viewport.matches);
+    updateViewport();
+    viewport.addEventListener("change", updateViewport);
+    return () => viewport.removeEventListener("change", updateViewport);
+  }, []);
 
   useEffect(() => {
     if (!uploadOpen && !crowdOpen) return;
@@ -237,14 +264,17 @@ export function MapExperience() {
         if (cancelled || !mapContainer.current) return;
 
         const map = new maps.Map(mapContainer.current, {
-          backgroundColor: "#e9eeec",
+          backgroundColor: "#f7ead7",
           center: { lat: 18.995, lng: 72.836 },
+          clickableIcons: false,
+          controlSize: 32,
           fullscreenControl: false,
           gestureHandling: "greedy",
           mapTypeControl: false,
+          styles: GOOGLE_MAP_STYLES,
           streetViewControl: false,
           zoom: 14,
-          zoomControl: true,
+          zoomControl: !window.matchMedia("(max-width: 767px)").matches,
         });
 
         mapRef.current = map;
@@ -276,7 +306,7 @@ export function MapExperience() {
     const syncPandals = () => {
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = visiblePandals.map((pandal) => {
-        const marker = createGoogleMarker(pandal, maps, map, (item) => {
+        const marker = createGoogleMarker(pandal, maps, map, compactViewport, (item) => {
           setSelected(item);
           setMobileListOpen(false);
           map.panTo(toMapPosition(item.coordinates));
@@ -287,7 +317,7 @@ export function MapExperience() {
     };
 
     syncPandals();
-  }, [mapReady, visiblePandals]);
+  }, [compactViewport, mapReady, visiblePandals]);
 
   const focusPandal = (pandal: Pandal) => {
     setSelected(pandal);
@@ -391,7 +421,7 @@ export function MapExperience() {
       setUploadPreview(null);
       setUploadLocation(null);
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        confetti({ particleCount: 35, spread: 45, origin: { y: 0.8 }, colors: ["#264e46", "#91b7a3", "#d8c99c"] });
+        confetti({ particleCount: 35, spread: 45, origin: { y: 0.8 }, colors: ["#f97316", "#db2777", "#0f9f91", "#f7c948"] });
       }
 
       mapRef.current?.panTo(toMapPosition(newPandal.coordinates));
@@ -492,6 +522,27 @@ export function MapExperience() {
         </div>
       </aside>
 
+      <nav className="mobile-action-dock" aria-label="Map actions">
+        <button
+          className="mobile-map-action"
+          type="button"
+          onClick={() => { setMobileListOpen(true); setSelected(null); }}
+          aria-expanded={mobileListOpen}
+        >
+          <MapIcon size={18} />
+          <span>Explore</span>
+          <b>{visiblePandals.length}</b>
+        </button>
+        <button className="mobile-map-action" type="button" onClick={locateUser}>
+          <LocateFixed size={18} />
+          <span>Near me</span>
+        </button>
+        <button className="mobile-map-action mobile-map-action-primary" type="button" onClick={() => { setUploadError(null); setUploadOpen(true); }}>
+          <Camera size={18} />
+          <span>Add</span>
+        </button>
+      </nav>
+
       <button
         type="button"
         className="browse-launcher"
@@ -539,10 +590,6 @@ export function MapExperience() {
           </div>
         </section>
       )}
-
-      <button className="mobile-add" type="button" aria-label="Add a pandal" onClick={() => { setUploadError(null); setUploadOpen(true); }}>
-        <Camera size={20} /> <span>Add pandal</span>
-      </button>
 
       {crowdOpen && selected && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
@@ -653,11 +700,13 @@ function createGoogleMarker(
   pandal: Pandal,
   maps: GoogleMapsApi,
   map: GoogleMapInstance,
+  compactViewport: boolean,
   onSelect: (pandal: Pandal) => void,
 ) {
+  const markerSize = compactViewport ? 40 : 50;
   const marker = new maps.Marker({
     icon: {
-      scaledSize: new maps.Size(52, 52),
+      scaledSize: new maps.Size(markerSize, markerSize),
       url: pandal.image,
     },
     map,
