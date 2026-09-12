@@ -46,15 +46,16 @@ Open [http://localhost:3000](http://localhost:3000).
 
 The development server supports hot reload, so browser changes appear as files are edited.
 
-If you are not linking the local checkout to Vercel, copy `.env.example` to `.env.local` and provide a Neon `DATABASE_URL` and a Vercel `BLOB_READ_WRITE_TOKEN`.
+If you are not linking the local checkout to Vercel, copy `.env.example` to `.env.local` and provide `DATABASE_URL`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, and `BLOB_READ_WRITE_TOKEN`.
 
 ### Vercel Setup
 
 1. Import this repository into Vercel and use `main` as the production branch.
-2. In Storage, create a Neon Postgres database through the Vercel Marketplace. Its `DATABASE_URL` must be available in Preview and Production. The CLI equivalent is `vercel integration add neon --name bappa-map-db --plan free`.
-3. In Storage, create a public Vercel Blob store and expose `BLOB_READ_WRITE_TOKEN` to Preview and Production. The CLI equivalent is `vercel blob create-store bappa-map-images --access public`.
-4. Add `PANDAL_ADMIN_KEY` to the Vercel project for Preview and Production. Use a long random value and keep it private. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions secrets. The Vercel project also needs `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` configured for both Preview and Production at runtime.
-5. Configure a Neon preview branch or separate preview database before merging pull requests.
+2. In Google Cloud, enable Maps JavaScript API, create a browser-restricted key, and allow `https://ganapati-bappa-moraya.vercel.app/*` plus `http://localhost:3000/*`. Add it to Vercel as `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` for Preview and Production.
+3. In Storage, create a Neon Postgres database through the Vercel Marketplace. Its `DATABASE_URL` must be available in Preview and Production. The CLI equivalent is `vercel integration add neon --name bappa-map-db --plan free`.
+4. In Storage, create a public Vercel Blob store and expose `BLOB_READ_WRITE_TOKEN` to Preview and Production. The CLI equivalent is `vercel blob create-store bappa-map-images --access public`.
+5. Add `PANDAL_ADMIN_KEY` to the Vercel project for Preview and Production. Use a long random value and keep it private. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions secrets. The Vercel project also needs `DATABASE_URL`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, and `BLOB_READ_WRITE_TOKEN` configured for both Preview and Production.
+6. Configure a Neon preview branch or separate preview database before merging pull requests.
 
 The `vercel-build` script runs `drizzle-kit migrate` before `next build`, so the Vercel build creates the schema on a new database and applies later migrations on every deployment. The `postgres` development dependency makes Drizzle Kit use its standard PostgreSQL driver for CLI/CI migrations; the app itself continues to use Neon’s HTTP driver at runtime. Vercel’s Marketplace provisions the database; the repository provisions its tables through Drizzle migrations.
 
