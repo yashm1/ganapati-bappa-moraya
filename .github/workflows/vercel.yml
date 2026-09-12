@@ -49,7 +49,6 @@ jobs:
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_ENVIRONMENT: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) && 'production' || 'preview' }}
       VERCEL_PROD_FLAG: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) && '--prod' || '' }}
     steps:
       - name: Check out repository
@@ -60,9 +59,6 @@ jobs:
         with:
           node-version: 22.13.0
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -77,24 +73,5 @@ jobs:
           test -n "$VERCEL_ORG_ID" || { echo "Missing GitHub Actions secret: VERCEL_ORG_ID"; exit 1; }
           test -n "$VERCEL_PROJECT_ID" || { echo "Missing GitHub Actions secret: VERCEL_PROJECT_ID"; exit 1; }
 
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment="$VERCEL_ENVIRONMENT" --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Validate database environment
-        run: >-
-          vercel env run
-          --environment="$VERCEL_ENVIRONMENT"
-          --token=${{ secrets.VERCEL_TOKEN }}
-          --
-          node -e 'const value = process.env.DATABASE_URL; if (!value || value === "[SENSITIVE]") throw new Error("DATABASE_URL is unavailable in the selected Vercel environment"); const url = new URL(value); if (!["postgres:", "postgresql:"].includes(url.protocol)) throw new Error(`DATABASE_URL must use postgres:// or postgresql:// (received ${url.protocol})`); console.log(`DATABASE_URL is configured for ${url.hostname}`);'
-
-      - name: Build with database migrations
-        run: >-
-          vercel env run
-          --environment="$VERCEL_ENVIRONMENT"
-          --token=${{ secrets.VERCEL_TOKEN }}
-          --
-          vercel build $VERCEL_PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy prebuilt application
-        run: vercel deploy --prebuilt $VERCEL_PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy and build on Vercel
+        run: vercel deploy --yes $VERCEL_PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
