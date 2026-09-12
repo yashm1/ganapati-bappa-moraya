@@ -34,6 +34,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 type CrowdLevel = "Low" | "Moderate" | "High";
+type MapColorProperty = "background-color" | "fill-color" | "line-color";
 
 type Pandal = {
   id: string;
@@ -221,7 +222,7 @@ export function MapExperience() {
 
     const map = new MapLibreMap({
       container: mapContainer.current,
-      style: "https://tiles.openfreemap.org/styles/positron",
+      style: "https://tiles.openfreemap.org/styles/bright",
       center: [72.836, 18.995],
       zoom: 14.05,
       pitch: 35,
@@ -243,7 +244,24 @@ export function MapExperience() {
 
     map.on("load", () => {
       setMapNotice("");
-      if (map.getLayer("water")) map.setPaintProperty("water", "fill-color", "#c8dedd");
+      const mapColorOverrides: Array<{ layer: string; property: MapColorProperty; value: string }> = [
+        { layer: "background", property: "background-color", value: "#f8f1e7" },
+        { layer: "water", property: "fill-color", value: "#9bd8e8" },
+        { layer: "water-intermittent", property: "fill-color", value: "#b7e4ee" },
+        { layer: "park", property: "fill-color", value: "#bfe3b5" },
+        { layer: "landcover-grass", property: "fill-color", value: "#dcefcf" },
+        { layer: "landcover-wood", property: "fill-color", value: "#a9d09e" },
+        { layer: "landuse-residential", property: "fill-color", value: "#f3e6d3" },
+        { layer: "building", property: "fill-color", value: "#ead9ca" },
+        { layer: "building-top", property: "fill-color", value: "#f1e2d4" },
+        { layer: "highway-minor", property: "line-color", value: "#fff6df" },
+        { layer: "highway-secondary-tertiary", property: "line-color", value: "#f5c27b" },
+        { layer: "highway-primary", property: "line-color", value: "#f2a65a" },
+        { layer: "highway-motorway", property: "line-color", value: "#ee8452" },
+      ];
+      mapColorOverrides.forEach(({ layer, property, value }) => {
+        if (map.getLayer(layer)) map.setPaintProperty(layer, property, value);
+      });
 
       const sourceName = Object.keys(map.getStyle().sources).find((name) => name.includes("openmaptiles"));
       const firstLabel = map
@@ -264,9 +282,9 @@ export function MapExperience() {
                 ["linear"],
                 ["zoom"],
                 12,
-                "#e3e5e2",
+                "#e8c6ae",
                 15.5,
-                "#d1d6d2",
+                "#d7a88b",
               ],
               "fill-extrusion-height": [
                 "interpolate",
@@ -304,7 +322,7 @@ export function MapExperience() {
         source: "pandals",
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": "#243e3b",
+          "circle-color": ["step", ["get", "point_count"], "#ef8354", 5, "#f4a261", 10, "#e76f51"],
           "circle-radius": ["step", ["get", "point_count"], 22, 5, 27, 10, 33],
           "circle-stroke-width": 5,
           "circle-stroke-color": "rgba(255,255,255,.92)",
@@ -331,7 +349,7 @@ export function MapExperience() {
         filter: ["!", ["has", "point_count"]],
         maxzoom: 14,
         paint: {
-          "circle-color": "#243e3b",
+          "circle-color": "#e76f51",
           "circle-radius": 22,
           "circle-stroke-width": 5,
           "circle-stroke-color": "rgba(255,255,255,.92)",

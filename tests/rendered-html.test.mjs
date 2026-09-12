@@ -50,9 +50,13 @@ test("server-renders the Bappa Map product", async () => {
 });
 
 test("ships map, persistence, and upload capabilities without starter residue", async () => {
-  const [page, mapExperience, vercelConfig, workflow, packageJson] = await Promise.all([
+  const [page, mapExperience, pandalRoute, adminPage, adminRoute, adminStatusRoute, vercelConfig, workflow, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/map-experience.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/pandals/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/pandals/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/pandals/[id]/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../vercel.json", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/vercel.yml", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -65,6 +69,12 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /api\/pandals/);
   assert.match(mapExperience, /result\.pandals/);
   assert.match(mapExperience, /setWorkerUrl\("\/maplibre\/maplibre-gl-worker\.mjs"\)/);
+  assert.match(mapExperience, /styles\/bright/);
+  assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
+  assert.match(adminPage, /Approve community pandals/);
+  assert.match(adminPage, /x-pandal-admin-key/);
+  assert.match(adminRoute, /eq\(pandals\.status, "pending"\)/);
+  assert.match(adminStatusRoute, /status must be approved or rejected/i);
   assert.match(vercelConfig, /"buildCommand": "npm run vercel-build"/);
   assert.match(workflow, /vercel deploy --yes/);
   assert.doesNotMatch(workflow, /vercel deploy --prebuilt/);

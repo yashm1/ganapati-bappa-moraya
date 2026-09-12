@@ -1,5 +1,5 @@
 import { del, put } from "@vercel/blob";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db/runtime";
 import { pandals } from "@/db/schema";
@@ -20,6 +20,7 @@ export async function GET() {
       crowd: pandals.crowd,
     })
     .from(pandals)
+    .where(eq(pandals.status, "approved"))
     .orderBy(desc(pandals.createdAt));
 
   return Response.json({
@@ -33,7 +34,7 @@ export async function GET() {
       wait: row.crowd === "Low" ? "5-10 min" : row.crowd === "High" ? "45+ min" : "20-30 min",
       eco: Boolean(row.eco),
       distance: "Community submission",
-      description: "A community-submitted pandal awaiting a quick accuracy check.",
+      description: "A community-submitted pandal shared by local devotees.",
     })),
   });
 }
@@ -102,5 +103,6 @@ export async function POST(request: Request) {
       distance: "Just added",
       description: "A community-submitted pandal awaiting a quick accuracy check.",
     },
+    status: "pending",
   });
 }

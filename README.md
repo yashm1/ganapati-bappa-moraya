@@ -11,6 +11,7 @@ The goal is to help people discover pandals, plan routes, share useful local det
 - Searchable, responsive pandal directory
 - Eco-friendly badges and community crowd reports
 - Geolocated photo submissions
+- Private moderation page for approving community submissions
 - Persistent community submissions
 
 ## Stack
@@ -52,7 +53,7 @@ If you are not linking the local checkout to Vercel, copy `.env.example` to `.en
 1. Import this repository into Vercel and use `main` as the production branch.
 2. In Storage, create a Neon Postgres database through the Vercel Marketplace. Its `DATABASE_URL` must be available in Preview and Production. The CLI equivalent is `vercel integration add neon --name bappa-map-db --plan free`.
 3. In Storage, create a public Vercel Blob store and expose `BLOB_READ_WRITE_TOKEN` to Preview and Production. The CLI equivalent is `vercel blob create-store bappa-map-images --access public`.
-4. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions secrets. The Vercel project needs `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` configured for both Preview and Production at runtime.
+4. Add `PANDAL_ADMIN_KEY` to the Vercel project for Preview and Production. Use a long random value and keep it private. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as GitHub Actions secrets. The Vercel project also needs `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` configured for both Preview and Production at runtime.
 5. Configure a Neon preview branch or separate preview database before merging pull requests.
 
 The `vercel-build` script runs `drizzle-kit migrate` before `next build`, so the Vercel build creates the schema on a new database and applies later migrations on every deployment. The `postgres` development dependency makes Drizzle Kit use its standard PostgreSQL driver for CLI/CI migrations; the app itself continues to use Neon’s HTTP driver at runtime. Vercel’s Marketplace provisions the database; the repository provisions its tables through Drizzle migrations.
@@ -99,4 +100,4 @@ tests/                Rendered application tests
 3. Run `npm run lint` and `npm test`.
 4. Open a pull request describing the user-facing change and how it was tested.
 
-Community submissions currently enter the database with a `pending` status. A moderation interface and public approval workflow are planned before a broader public launch.
+Community submissions enter the database with a `pending` status and do not appear publicly until approved. To review them, open `/admin`, enter the value of `PANDAL_ADMIN_KEY`, and choose Approve or Reject. The admin key is sent only in a request header and is not stored in the browser.
