@@ -60,7 +60,8 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /api\/pandals/);
   assert.match(mapExperience, /result\.pandals/);
   assert.match(vercelConfig, /"buildCommand": "npm run vercel-build"/);
-  assert.match(workflow, /vercel deploy --prebuilt/);
+  assert.match(workflow, /vercel deploy --yes/);
+  assert.doesNotMatch(workflow, /vercel deploy --prebuilt/);
   assert.match(packageJson, /"db:migrate": "drizzle-kit migrate"/);
   assert.match(packageJson, /"maplibre-gl"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
