@@ -19,24 +19,36 @@ import {
   X,
 } from "lucide-react";
 import confetti from "canvas-confetti";
-import {
-  AttributionControl,
-  LngLatBounds,
-  setWorkerUrl,
-  type GeoJSONSource,
-  Map as MapLibreMap,
-  Marker,
-  NavigationControl,
-} from "maplibre-gl";
-import type { FeatureCollection, Point } from "geojson";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { loadGoogleMaps } from "@/lib/google-maps.mjs";
 import { installMapResumeHandler } from "@/lib/map-resume.mjs";
 
-setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
-
 type CrowdLevel = "Low" | "Moderate" | "High";
-type MapColorProperty = "background-color" | "fill-color" | "line-color";
+
+type MapPosition = { lat: number; lng: number };
+type GoogleMapInstance = {
+  fitBounds: (bounds: GoogleBounds, padding?: unknown) => void;
+  getZoom: () => number | undefined;
+  panTo: (position: MapPosition) => void;
+  setCenter: (position: MapPosition) => void;
+  setZoom: (zoom: number) => void;
+};
+type GoogleMarkerInstance = {
+  addListener: (event: string, handler: () => void) => { remove: () => void };
+  setMap: (map: GoogleMapInstance | null) => void;
+};
+type GoogleBounds = {
+  extend: (position: MapPosition) => GoogleBounds;
+  isEmpty: () => boolean;
+};
+type GoogleMapsApi = {
+  Map: new (container: HTMLElement, options: Record<string, unknown>) => GoogleMapInstance;
+  Marker: new (options: Record<string, unknown>) => GoogleMarkerInstance;
+  LatLngBounds: new () => GoogleBounds;
+  Size: new (width: number, height: number) => unknown;
+  event: { trigger: (target: GoogleMapInstance, event: string) => void };
+};
 
 type Pandal = {
   id: string;
@@ -146,9 +158,11 @@ const crowdClass: Record<CrowdLevel, string> = {
 
 export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MapLibreMap | null>(null);
-  const markerRefs = useRef<Marker[]>([]);
+  const mapRef = useRef<GoogleMapInstance | null>(null);
+  const mapsApiRef = useRef<GoogleMapsApi | null>(null);
+  const markerRefs = useRef<GoogleMarkerInstance[]>([]);
   const [pandals, setPandals] = useState(PANDALS);
+  const [mapReady, setMapReady] = useState(false);
   const [selected, setSelected] = useState<Pandal | null>(null);
   const [query, setQuery] = useState("");
   const [ecoOnly, setEcoOnly] = useState(false);
@@ -185,13 +199,6 @@ export function MapExperience() {
 
   useEffect(() => () => { if (uploadPreview) URL.revokeObjectURL(uploadPreview); }, [uploadPreview]);
 
-  useEffect(() => {
-    markerRefs.current.forEach(marker => {
-      const element = marker.getElement();
-      element.setAttribute("aria-pressed", String(element.dataset.pandalId === selected?.id));
-    });
-  }, [selected]);
-
   const visiblePandals = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return pandals.filter((pandal) => {
@@ -221,231 +228,80 @@ export function MapExperience() {
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
+    let cancelled = false;
+    let cleanupMapResume: () => void = () => undefined;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-    const map = new MapLibreMap({
-      container: mapContainer.current,
-      style: "https://tiles.openfreemap.org/styles/bright",
-      center: [72.836, 18.995],
-      zoom: 14.05,
-      pitch: 35,
-      bearing: 0,
-      canvasContextAttributes: { antialias: true },
-      attributionControl: false,
-      maxPitch: 75,
-    });
+    loadGoogleMaps(apiKey ?? "", window)
+      .then((maps: GoogleMapsApi) => {
+        if (cancelled || !mapContainer.current) return;
 
-    mapRef.current = map;
-    const cleanupMapResume = installMapResumeHandler(map);
-    map.addControl(new NavigationControl({ showCompass: true }), "bottom-right");
-    map.addControl(new AttributionControl({ compact: false }), "bottom-right");
-    map.on("error", () => setMapNotice("Map unavailable. Check your connection and reload."));
-
-    map.on("load", () => {
-      setMapNotice("");
-      const mapColorOverrides: Array<{ layer: string; property: MapColorProperty; value: string }> = [
-        { layer: "background", property: "background-color", value: "#f8f1e7" },
-        { layer: "water", property: "fill-color", value: "#9bd8e8" },
-        { layer: "water-intermittent", property: "fill-color", value: "#b7e4ee" },
-        { layer: "park", property: "fill-color", value: "#bfe3b5" },
-        { layer: "landcover-grass", property: "fill-color", value: "#dcefcf" },
-        { layer: "landcover-wood", property: "fill-color", value: "#a9d09e" },
-        { layer: "landuse-residential", property: "fill-color", value: "#f3e6d3" },
-        { layer: "building", property: "fill-color", value: "#ead9ca" },
-        { layer: "building-top", property: "fill-color", value: "#f1e2d4" },
-        { layer: "highway-minor", property: "line-color", value: "#fff6df" },
-        { layer: "highway-secondary-tertiary", property: "line-color", value: "#f5c27b" },
-        { layer: "highway-primary", property: "line-color", value: "#f2a65a" },
-        { layer: "highway-motorway", property: "line-color", value: "#ee8452" },
-      ];
-      mapColorOverrides.forEach(({ layer, property, value }) => {
-        if (map.getLayer(layer)) map.setPaintProperty(layer, property, value);
-      });
-
-      const sourceName = Object.keys(map.getStyle().sources).find((name) => name.includes("openmaptiles"));
-      const firstLabel = map
-        .getStyle()
-        .layers.find((layer) => layer.type === "symbol" && layer.layout?.["text-field"])?.id;
-
-      if (sourceName && !map.getLayer("bappa-3d-buildings")) {
-        map.addLayer(
-          {
-            id: "bappa-3d-buildings",
-            source: sourceName,
-            "source-layer": "building",
-            type: "fill-extrusion",
-            minzoom: 12,
-            paint: {
-              "fill-extrusion-color": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                12,
-                "#e8c6ae",
-                15.5,
-                "#d7a88b",
-              ],
-              "fill-extrusion-height": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                12,
-                0,
-                15,
-                ["coalesce", ["get", "render_height"], ["get", "height"], 14],
-              ],
-              "fill-extrusion-base": [
-                "coalesce",
-                ["get", "render_min_height"],
-                ["get", "min_height"],
-                0,
-              ],
-              "fill-extrusion-opacity": 0.82,
-            },
-          },
-          firstLabel,
-        );
-      }
-
-      map.addSource("pandals", {
-        type: "geojson",
-        data: toGeoJson(PANDALS),
-        cluster: true,
-        clusterMaxZoom: 13,
-        clusterRadius: 62,
-      });
-
-      map.addLayer({
-        id: "pandal-clusters",
-        type: "circle",
-        source: "pandals",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": ["step", ["get", "point_count"], "#ef8354", 5, "#f4a261", 10, "#e76f51"],
-          "circle-radius": ["step", ["get", "point_count"], 22, 5, 27, 10, 33],
-          "circle-stroke-width": 5,
-          "circle-stroke-color": "rgba(255,255,255,.92)",
-        },
-      });
-
-      map.addLayer({
-        id: "pandal-cluster-count",
-        type: "symbol",
-        source: "pandals",
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": ["get", "point_count_abbreviated"],
-          "text-size": 13,
-          "text-font": ["Noto Sans Bold"],
-        },
-        paint: { "text-color": "#ffffff" },
-      });
-
-      map.addLayer({
-        id: "pandal-singletons",
-        type: "circle",
-        source: "pandals",
-        filter: ["!", ["has", "point_count"]],
-        maxzoom: 14,
-        paint: {
-          "circle-color": "#e76f51",
-          "circle-radius": 22,
-          "circle-stroke-width": 5,
-          "circle-stroke-color": "rgba(255,255,255,.92)",
-        },
-      });
-
-      map.addLayer({
-        id: "pandal-singleton-count",
-        type: "symbol",
-        source: "pandals",
-        filter: ["!", ["has", "point_count"]],
-        maxzoom: 14,
-        layout: {
-          "text-field": "1",
-          "text-size": 13,
-          "text-font": ["Noto Sans Bold"],
-        },
-        paint: { "text-color": "#ffffff" },
-      });
-
-      map.on("click", "pandal-clusters", async (event) => {
-        const feature = event.features?.[0];
-        const clusterId = feature?.properties?.cluster_id;
-        const source = map.getSource("pandals") as GeoJSONSource;
-        if (clusterId == null) return;
-        const zoom = await source.getClusterExpansionZoom(clusterId);
-        const coordinates = (feature?.geometry as Point).coordinates as [number, number];
-        map.easeTo({ center: coordinates, zoom, duration: 700 });
-      });
-
-      const syncMarkerVisibility = () => {
-        const show = map.getZoom() >= 14;
-        markerRefs.current.forEach((marker) => {
-          marker.getElement().hidden = !show;
+        const map = new maps.Map(mapContainer.current, {
+          backgroundColor: "#e9eeec",
+          center: { lat: 18.995, lng: 72.836 },
+          fullscreenControl: false,
+          gestureHandling: "greedy",
+          mapTypeControl: false,
+          streetViewControl: false,
+          zoom: 14,
+          zoomControl: true,
         });
-      };
 
-      syncMarkerVisibility();
-      map.on("zoom", syncMarkerVisibility);
-    });
+        mapRef.current = map;
+        mapsApiRef.current = maps;
+        cleanupMapResume = installMapResumeHandler(() => maps.event.trigger(map, "resize"));
+        setMapNotice("");
+        setMapReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setMapNotice("Map unavailable. Check the Google Maps API key and reload.");
+      });
 
     return () => {
+      cancelled = true;
       cleanupMapResume();
-      markerRefs.current.forEach((marker) => marker.remove());
+      markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
-      map.remove();
       mapRef.current = null;
+      mapsApiRef.current = null;
+      setMapReady(false);
     };
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    const maps = mapsApiRef.current;
+    if (!map || !maps || !mapReady) return;
 
     const syncPandals = () => {
-      const source = map.getSource("pandals") as GeoJSONSource | undefined;
-      source?.setData(toGeoJson(visiblePandals));
-
-      markerRefs.current.forEach((marker) => marker.remove());
-      const markersVisible = map.getZoom() >= 14;
+      markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = visiblePandals.map((pandal) => {
-        const marker = new Marker({ element: createPhotoMarker(pandal, (item) => {
+        const marker = createGoogleMarker(pandal, maps, map, (item) => {
           setSelected(item);
           setMobileListOpen(false);
-          map.easeTo({ center: item.coordinates, zoom: 15.35, pitch: 40, offset: [0, -100], duration: 1000 });
-        }), anchor: "bottom" })
-          .setLngLat(pandal.coordinates)
-          .addTo(map);
-        marker.getElement().hidden = !markersVisible;
+          map.panTo(toMapPosition(item.coordinates));
+          map.setZoom(15);
+        });
         return marker;
       });
     };
 
-    if (map.isStyleLoaded()) syncPandals();
-    else map.once("load", syncPandals);
-
-    return () => {
-      map.off("load", syncPandals);
-    };
-  }, [visiblePandals]);
+    syncPandals();
+  }, [mapReady, visiblePandals]);
 
   const focusPandal = (pandal: Pandal) => {
     setSelected(pandal);
     setMobileListOpen(false);
-    mapRef.current?.easeTo({
-      center: pandal.coordinates,
-      zoom: 15.35,
-      pitch: 40,
-      offset: [0, -100],
-      duration: 1000,
-    });
+    mapRef.current?.panTo(toMapPosition(pandal.coordinates));
+    mapRef.current?.setZoom(15);
   };
 
   const locateUser = () => {
     if (!navigator.geolocation) { setMapNotice("Location is unavailable in this browser."); return; }
     navigator.geolocation.getCurrentPosition(({ coords }) => {
       setMapNotice("");
-      mapRef.current?.easeTo({ center: [coords.longitude, coords.latitude], zoom: 15, duration: 900 });
+      mapRef.current?.panTo({ lat: coords.latitude, lng: coords.longitude });
+      mapRef.current?.setZoom(15);
     }, () => setMapNotice("Location access is unavailable. You can still search and explore."), { timeout: 10000 });
   };
 
@@ -455,8 +311,19 @@ export function MapExperience() {
     setQuery("");
     setEcoOnly(false);
     setLowOnly(false);
-    const bounds = pandals.reduce((result, pandal) => result.extend(pandal.coordinates), new LngLatBounds());
-    if (!bounds.isEmpty()) mapRef.current?.fitBounds(bounds, { padding: { top: 150, bottom: 220, left: 55, right: 55 }, maxZoom: 14.05, pitch: 25, duration: 1000 });
+    const map = mapRef.current;
+    const maps = mapsApiRef.current;
+    if (!map || !maps) return;
+    const bounds = pandals.reduce(
+      (result, pandal) => result.extend(toMapPosition(pandal.coordinates)),
+      new maps.LatLngBounds(),
+    );
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { top: 150, bottom: 220, left: 55, right: 55 });
+      window.setTimeout(() => {
+        if ((map.getZoom() ?? 0) > 14) map.setZoom(14);
+      }, 250);
+    }
   };
 
   const captureUploadLocation = () => {
@@ -470,7 +337,8 @@ export function MapExperience() {
       ({ coords }) => {
         const coordinates: [number, number] = [coords.longitude, coords.latitude];
         setUploadLocation(coordinates);
-        mapRef.current?.easeTo({ center: coordinates, zoom: 16, duration: 700 });
+        mapRef.current?.panTo(toMapPosition(coordinates));
+        mapRef.current?.setZoom(16);
       },
       () => setUploadError("We could not access your location. Allow location access and try again."),
       { enableHighAccuracy: true, timeout: 10_000 },
@@ -526,9 +394,8 @@ export function MapExperience() {
         confetti({ particleCount: 35, spread: 45, origin: { y: 0.8 }, colors: ["#264e46", "#91b7a3", "#d8c99c"] });
       }
 
-      if (mapRef.current) {
-        mapRef.current.easeTo({ center: newPandal.coordinates, zoom: 16, pitch: 62, duration: 800 });
-      }
+      mapRef.current?.panTo(toMapPosition(newPandal.coordinates));
+      mapRef.current?.setZoom(16);
       form.reset();
     } catch {
       setUploadError("The upload could not reach the server. Check your connection and try again.");
@@ -778,27 +645,25 @@ export function MapExperience() {
   );
 }
 
-function createPhotoMarker(pandal: Pandal, onSelect: (pandal: Pandal) => void) {
-  const markerButton = document.createElement("button");
-  markerButton.className = "photo-marker";
-  markerButton.type = "button";
-  markerButton.dataset.pandalId = pandal.id;
-  markerButton.title = pandal.name;
-  markerButton.setAttribute("aria-label", `Open ${pandal.name}`);
-  markerButton.style.setProperty("--marker-image", `url(${pandal.image})`);
-  markerButton.innerHTML = pandal.eco ? '<span class="marker-eco">*</span>' : "";
-  markerButton.addEventListener("click", () => onSelect(pandal));
-  return markerButton;
+function toMapPosition(coordinates: [number, number]): MapPosition {
+  return { lat: coordinates[1], lng: coordinates[0] };
 }
 
-
-function toGeoJson(pandals: Pandal[]): FeatureCollection<Point> {
-  return {
-    type: "FeatureCollection",
-    features: pandals.map((pandal) => ({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: pandal.coordinates },
-      properties: { id: pandal.id, name: pandal.name },
-    })),
-  };
+function createGoogleMarker(
+  pandal: Pandal,
+  maps: GoogleMapsApi,
+  map: GoogleMapInstance,
+  onSelect: (pandal: Pandal) => void,
+) {
+  const marker = new maps.Marker({
+    icon: {
+      scaledSize: new maps.Size(52, 52),
+      url: pandal.image,
+    },
+    map,
+    position: toMapPosition(pandal.coordinates),
+    title: pandal.name,
+  });
+  marker.addListener("click", () => onSelect(pandal));
+  return marker;
 }
