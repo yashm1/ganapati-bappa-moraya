@@ -57,7 +57,7 @@ If you are not linking the local checkout to Vercel, copy `.env.example` to `.en
 
 The `vercel-build` script runs `drizzle-kit migrate` before `next build`, so the Vercel build creates the schema on a new database and applies later migrations on every deployment. The `postgres` development dependency makes Drizzle Kit use its standard PostgreSQL driver for CLI/CI migrations; the app itself continues to use Neon’s HTTP driver at runtime. Vercel’s Marketplace provisions the database; the repository provisions its tables through Drizzle migrations.
 
-The GitHub workflow at `.github/workflows/vercel.yml` runs lint and tests for pull requests and pushes. It creates preview deployments for pull requests from this repository and production deployments for pushes to `main`. Fork pull requests are validated but are not deployed because GitHub does not expose repository secrets to them. If Vercel’s native Git integration is enabled for this repository, disable one of the two deployment mechanisms to avoid duplicate deployments.
+The GitHub workflow at `.github/workflows/vercel.yml` runs lint and tests for pull requests and pushes. It uses `vercel env run` during the build because sensitive Vercel variables are replaced with `[SENSITIVE]` placeholders by `vercel pull`; this keeps `DATABASE_URL` available to migrations without writing its value to the workspace. It creates preview deployments for pull requests from this repository and production deployments for pushes to `main`. Fork pull requests are validated but are not deployed because GitHub does not expose repository secrets to them. If Vercel’s native Git integration is enabled for this repository, disable one of the two deployment mechanisms to avoid duplicate deployments.
 
 ### Local Data
 
