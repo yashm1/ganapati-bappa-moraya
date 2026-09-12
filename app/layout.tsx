@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { headers } from "next/headers";
-import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
 const geist = Geist({
