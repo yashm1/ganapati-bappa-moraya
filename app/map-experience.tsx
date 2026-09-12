@@ -234,12 +234,7 @@ export function MapExperience() {
 
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: true }), "bottom-right");
-    map.addControl(new AttributionControl({ compact: true }), "bottom-right");
-    const collapseAttribution = () => {
-      map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
-    };
-    collapseAttribution();
-    map.once("idle", collapseAttribution);
+    map.addControl(new AttributionControl({ compact: false }), "bottom-right");
     map.on("error", () => setMapNotice("Map unavailable. Check your connection and reload."));
 
     map.on("load", () => {
