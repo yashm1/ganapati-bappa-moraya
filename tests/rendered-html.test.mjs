@@ -42,11 +42,6 @@ test("server-renders the Bappa Map product", async () => {
   assert.match(html, /Explore pandals/);
   assert.match(html, /Lalbaugcha Raja/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
-
-  const workerResponse = await fetch(`http://127.0.0.1:${port}/maplibre/maplibre-gl-worker.mjs`);
-  const sharedWorkerResponse = await fetch(`http://127.0.0.1:${port}/maplibre/maplibre-gl-shared.mjs`);
-  assert.equal(workerResponse.status, 200);
-  assert.equal(sharedWorkerResponse.status, 200);
 });
 
 test("ships map, persistence, and upload capabilities without starter residue", async () => {
@@ -63,14 +58,15 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   ]);
 
   assert.match(page, /MapExperience/);
-  assert.match(mapExperience, /clusterMaxZoom/);
-  assert.match(mapExperience, /pandal-singleton-count/);
-  assert.doesNotMatch(mapExperience, /Visarjan routes|visarjan-routes|immersion-points/);
+  assert.doesNotMatch(mapExperience, /openfreemap|openmaptiles|maplibre/i);
+  assert.match(mapExperience, /NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/);
+  assert.match(mapExperience, /google\.com\/maps\/dir/);
+  assert.match(mapExperience, /noopener noreferrer/);
   assert.match(mapExperience, /api\/pandals/);
   assert.match(mapExperience, /result\.pandals/);
   assert.match(mapExperience, /waiting for approval/);
-  assert.match(mapExperience, /setWorkerUrl\("\/maplibre\/maplibre-gl-worker\.mjs"\)/);
-  assert.match(mapExperience, /styles\/bright/);
+  assert.match(mapExperience, /loadGoogleMaps/);
+  assert.match(mapExperience, /installMapResumeHandler/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
   assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);
   assert.match(pandalRoute, /Photo storage is not configured/);
@@ -83,8 +79,5 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(workflow, /vercel deploy --yes/);
   assert.doesNotMatch(workflow, /vercel deploy --prebuilt/);
   assert.match(packageJson, /"db:migrate": "drizzle-kit migrate"/);
-  assert.match(packageJson, /"maplibre-gl"/);
-  assert.match(packageJson, /"prebuild": "node \.\/scripts\/copy-maplibre-worker\.mjs"/);
-  assert.match(packageJson, /"predev": "node \.\/scripts\/copy-maplibre-worker\.mjs"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 });
