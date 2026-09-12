@@ -61,6 +61,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
 .detail-stats span { display:flex; gap:5px; align-items:center; } .detail-stats b { font-weight:500; }
 .detail-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .directions-action,.crowd-action { display:flex; align-items:center; justify-content:center; gap:6px; min-height:46px; padding:8px; border:1px solid var(--line); border-radius:6px; font-size:14px; background:#fff; }
+.directions-action { text-decoration:none; }
 .directions-action { color:#fff; background:#264e46; border-color:#264e46; }
 .directions-action svg:last-child { display:none; }
 .locate-mobile { position:absolute; right:16px; bottom:max(20px,env(safe-area-inset-bottom)); z-index:8; display:grid; place-items:center; width:44px; height:44px; border:1px solid #fff; border-radius:7px; background:#ffffffed; box-shadow:var(--shadow); }
