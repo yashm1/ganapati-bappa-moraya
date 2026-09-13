@@ -928,6 +928,9 @@ function createGoogleMarker(
   const marker = new maps.Marker({
     icon: {
       anchor: new maps.Point(markerSize / 2, markerSize),
+      // Declare the image origin as well as its anchor so Google Maps does
+      // not infer sprite geometry again while tiles are being refreshed.
+      origin: new maps.Point(0, 0),
       scaledSize: new maps.Size(markerSize, markerSize),
       url: pandal.image,
     },
