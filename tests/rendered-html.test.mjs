@@ -77,7 +77,9 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /GOOGLE_MAP_STYLES/);
   assert.match(mapExperience, /MarkerClusterer/);
   assert.match(mapExperience, /SuperClusterAlgorithm/);
-  assert.match(mapExperience, /compactViewport \? 32 : 36/);
+  assert.match(mapExperience, /compactViewport \? 40 : 50/);
+  assert.match(mapExperience, /url: pandal\.image/);
+  assert.doesNotMatch(mapExperience, /createPandalMarkerIcon/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
   assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);
   assert.match(pandalRoute, /Photo storage is not configured/);

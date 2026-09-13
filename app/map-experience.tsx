@@ -733,32 +733,17 @@ function createGoogleMarker(
   compactViewport: boolean,
   onSelect: (pandal: Pandal) => void,
 ) {
-  const markerWidth = compactViewport ? 32 : 36;
-  const markerHeight = Math.round(markerWidth * 1.24);
+  const markerSize = compactViewport ? 40 : 50;
   const marker = new maps.Marker({
     icon: {
-      anchor: new maps.Point(markerWidth / 2, markerHeight),
-      scaledSize: new maps.Size(markerWidth, markerHeight),
-      url: createPandalMarkerIcon(pandal),
+      scaledSize: new maps.Size(markerSize, markerSize),
+      url: pandal.image,
     },
     position: toMapPosition(pandal.coordinates),
     title: pandal.name,
   });
   marker.addListener("click", () => onSelect(pandal));
   return marker;
-}
-
-function createPandalMarkerIcon(pandal: Pandal) {
-  const color = pandal.crowd === "High" ? "#d13f61" : pandal.crowd === "Moderate" ? "#e8792e" : "#168b7d";
-  const ecoBadge = pandal.eco ? '<circle cx="31" cy="8" r="5" fill="#35a85f" stroke="#fff" stroke-width="2" />' : "";
-  return toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 50">
-      <path d="M20 1.5C9.8 1.5 2 9.3 2 19.1C2 32.2 20 48.5 20 48.5S38 32.2 38 19.1C38 9.3 30.2 1.5 20 1.5Z" fill="${color}" stroke="#fff" stroke-width="2.5" />
-      <circle cx="20" cy="19" r="10.5" fill="#fff" fill-opacity=".96" />
-      <text x="20" y="24" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="${color}">ग</text>
-      ${ecoBadge}
-    </svg>
-  `);
 }
 
 function createClusterMarkerIcon(count: number) {
