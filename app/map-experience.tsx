@@ -14,6 +14,7 @@ import {
   MapPin,
   Navigation,
   Plus,
+  RotateCcw,
   Search,
   Users,
   X,
@@ -34,6 +35,7 @@ type GoogleMapInstance = {
   panTo: (position: MapPosition) => void;
   setCenter: (position: MapPosition) => void;
   setZoom: (zoom: number) => void;
+  setOptions?: (options: Record<string, unknown>) => void;
 };
 type GoogleMarkerInstance = {
   addListener: (event: string, handler: () => void) => { remove: () => void };
@@ -205,7 +207,9 @@ export function MapExperience() {
   const [selected, setSelected] = useState<Pandal | null>(null);
   const [query, setQuery] = useState("");
   const [ecoOnly, setEcoOnly] = useState(false);
-  const [lowOnly, setLowOnly] = useState(false);
+  const [crowdFilter, setCrowdFilter] = useState<string>("All");
+  const [selectedArea, setSelectedArea] = useState<string>("All");
+  const [sortBy, setSortBy] = useState<string>("default");
   const [mapNotice, setMapNotice] = useState("Loading the map...");
   const [mobileListOpen, setMobileListOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -247,13 +251,52 @@ export function MapExperience() {
 
   useEffect(() => () => { if (uploadPreview) URL.revokeObjectURL(uploadPreview); }, [uploadPreview]);
 
+  const uniqueAreas = useMemo(() => {
+    const areas = pandals.map((p) => p.area).filter(Boolean);
+    return Array.from(new Set(areas)).sort();
+  }, [pandals]);
+
   const visiblePandals = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return pandals.filter((pandal) => {
+    let filtered = pandals.filter((pandal) => {
       const matchesSearch = `${pandal.name} ${pandal.area}`.toLowerCase().includes(normalized);
-      return matchesSearch && (!ecoOnly || pandal.eco) && (!lowOnly || pandal.crowd === "Low");
+      const matchesEco = !ecoOnly || pandal.eco;
+      const matchesCrowd = crowdFilter === "All" || pandal.crowd === crowdFilter;
+      const matchesArea = selectedArea === "All" || pandal.area === selectedArea;
+      return matchesSearch && matchesEco && matchesCrowd && matchesArea;
     });
-  }, [ecoOnly, lowOnly, pandals, query]);
+
+    if (sortBy === "crowd") {
+      const order: Record<CrowdLevel, number> = { Low: 1, Moderate: 2, High: 3 };
+      filtered = [...filtered].sort((a, b) => order[a.crowd] - order[b.crowd]);
+    } else if (sortBy === "name") {
+      filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return filtered;
+  }, [crowdFilter, ecoOnly, pandals, query, selectedArea, sortBy]);
+
+  const hasActiveFilters = useMemo(() => {
+    return query.trim() !== "" || ecoOnly || crowdFilter !== "All" || selectedArea !== "All" || sortBy !== "default";
+  }, [query, ecoOnly, crowdFilter, selectedArea, sortBy]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (query.trim()) count++;
+    if (ecoOnly) count++;
+    if (crowdFilter !== "All") count++;
+    if (selectedArea !== "All") count++;
+    if (sortBy !== "default") count++;
+    return count;
+  }, [query, ecoOnly, crowdFilter, selectedArea, sortBy]);
+
+  const clearFilters = () => {
+    setQuery("");
+    setEcoOnly(false);
+    setCrowdFilter("All");
+    setSelectedArea("All");
+    setSortBy("default");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -426,8 +469,21 @@ export function MapExperience() {
   const focusPandal = (pandal: Pandal) => {
     setSelected(pandal);
     setMobileListOpen(false);
-    mapRef.current?.panTo(toMapPosition(pandal.coordinates));
-    mapRef.current?.setZoom(15);
+    const map = mapRef.current;
+    if (!map) return;
+    const targetPos = toMapPosition(pandal.coordinates);
+    if (map.setOptions) {
+      map.setOptions({
+        padding: compactViewport
+          ? { top: 60, bottom: 250, left: 16, right: 16 }
+          : { top: 90, bottom: 30, left: 380, right: 30 },
+      });
+    }
+    map.panTo(targetPos);
+    const currentZoom = map.getZoom() ?? 14;
+    if (currentZoom < 15) {
+      map.setZoom(15);
+    }
   };
 
   const locateUser = () => {
@@ -442,12 +498,13 @@ export function MapExperience() {
   const resetMap = () => {
     setSelected(null);
     setMobileListOpen(false);
-    setQuery("");
-    setEcoOnly(false);
-    setLowOnly(false);
+    clearFilters();
     const map = mapRef.current;
     const maps = mapsApiRef.current;
     if (!map || !maps) return;
+    if (map.setOptions) {
+      map.setOptions({ padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+    }
     const bounds = pandals.reduce(
       (result, pandal) => result.extend(toMapPosition(pandal.coordinates)),
       new maps.LatLngBounds(),
@@ -591,16 +648,75 @@ export function MapExperience() {
           </button>
         </div>
 
-        <div className="filter-strip">
-          <button className={!ecoOnly && !lowOnly ? "filter-chip active" : "filter-chip"} type="button" onClick={() => { setEcoOnly(false); setLowOnly(false); }}>
-            All
+        <div className="filter-strip" role="region" aria-label="Filter pandals">
+          <button
+            className={!hasActiveFilters ? "filter-chip active" : "filter-chip"}
+            type="button"
+            onClick={clearFilters}
+          >
+            All ({pandals.length})
           </button>
-          <button className={ecoOnly ? "filter-chip eco active" : "filter-chip eco"} type="button" onClick={() => setEcoOnly((value) => !value)}>
-            <Leaf size={14} /> Eco-friendly
+
+          <button
+            className={ecoOnly ? "filter-chip eco active" : "filter-chip eco"}
+            type="button"
+            aria-pressed={ecoOnly}
+            onClick={() => setEcoOnly((value) => !value)}
+          >
+            <Leaf size={14} aria-hidden="true" /> Eco-friendly
           </button>
-          <button className={lowOnly ? "filter-chip active" : "filter-chip"} type="button" aria-pressed={lowOnly} onClick={() => setLowOnly(value => !value)}>
-            <Users size={14} /> Low crowd
-          </button>
+
+          <div className="filter-select-wrapper">
+            <select
+              className={crowdFilter !== "All" ? "filter-select active" : "filter-select"}
+              value={crowdFilter}
+              onChange={(e) => setCrowdFilter(e.target.value)}
+              aria-label="Filter by crowd level"
+            >
+              <option value="All">Crowd: All</option>
+              <option value="Low">Low crowd</option>
+              <option value="Moderate">Moderate crowd</option>
+              <option value="High">High crowd</option>
+            </select>
+          </div>
+
+          <div className="filter-select-wrapper">
+            <select
+              className={selectedArea !== "All" ? "filter-select active" : "filter-select"}
+              value={selectedArea}
+              onChange={(e) => setSelectedArea(e.target.value)}
+              aria-label="Filter by area"
+            >
+              <option value="All">Area: All</option>
+              {uniqueAreas.map((area) => (
+                <option key={area} value={area}>{area}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-select-wrapper">
+            <select
+              className={sortBy !== "default" ? "filter-select active" : "filter-select"}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort pandals"
+            >
+              <option value="default">Sort: Recommended</option>
+              <option value="crowd">Sort: Crowd (Low first)</option>
+              <option value="name">Sort: Name (A-Z)</option>
+            </select>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              className="filter-chip clear-chip"
+              type="button"
+              onClick={clearFilters}
+              aria-label="Clear all filters"
+            >
+              <RotateCcw size={13} aria-hidden="true" /> Reset ({activeFilterCount})
+            </button>
+          )}
         </div>
 
         <div className="directory-list">
@@ -806,12 +922,16 @@ function createGoogleMarker(
   compactViewport: boolean,
   onSelect: (pandal: Pandal) => void,
 ) {
-  const markerSize = compactViewport ? 40 : 50;
+  // Keep photo markers noticeably lighter than cluster badges so they do not
+  // overpower the map on a compact screen.
+  const markerSize = compactViewport ? 28 : 34;
   const marker = new maps.Marker({
     icon: {
+      anchor: new maps.Point(markerSize / 2, markerSize),
       scaledSize: new maps.Size(markerSize, markerSize),
       url: pandal.image,
     },
+    optimized: true,
     position: toMapPosition(pandal.coordinates),
     title: pandal.name,
   });
