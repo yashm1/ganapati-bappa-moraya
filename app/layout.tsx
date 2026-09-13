@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { headers } from "next/headers";
 import "./globals.css";
 
 const geist = Geist({
@@ -8,11 +7,8 @@ const geist = Geist({
   subsets: ["latin"],
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
+export function generateMetadata(): Metadata {
+  const origin = getSiteOrigin();
 
   return {
     metadataBase: new URL(origin),
@@ -33,6 +29,18 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [`${origin}/og.png`],
     },
   };
+}
+
+function getSiteOrigin() {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (!configured) return "http://localhost:3000";
+
+  try {
+    const url = new URL(configured.startsWith("http") ? configured : `https://${configured}`);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "http://localhost:3000";
+  } catch {
+    return "http://localhost:3000";
+  }
 }
 
 export default function RootLayout({

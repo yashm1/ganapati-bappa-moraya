@@ -18,6 +18,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { MarkerClusterer, SuperClusterAlgorithm } from "@googlemaps/markerclusterer";
 import confetti from "canvas-confetti";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -46,9 +47,11 @@ type GoogleMapsApi = {
   Map: new (container: HTMLElement, options: Record<string, unknown>) => GoogleMapInstance;
   Marker: new (options: Record<string, unknown>) => GoogleMarkerInstance;
   LatLngBounds: new () => GoogleBounds;
+  Point: new (x: number, y: number) => unknown;
   Size: new (width: number, height: number) => unknown;
   event: { trigger: (target: GoogleMapInstance, event: string) => void };
 };
+type DisposableMarkerClusterer = MarkerClusterer & { setMap: (map: null) => void };
 
 type Pandal = {
   id: string;
@@ -179,6 +182,7 @@ export function MapExperience() {
   const mapRef = useRef<GoogleMapInstance | null>(null);
   const mapsApiRef = useRef<GoogleMapsApi | null>(null);
   const markerRefs = useRef<GoogleMarkerInstance[]>([]);
+  const markerClusterRef = useRef<DisposableMarkerClusterer | null>(null);
   const [pandals, setPandals] = useState(PANDALS);
   const [mapReady, setMapReady] = useState(false);
   const [selected, setSelected] = useState<Pandal | null>(null);
@@ -290,6 +294,9 @@ export function MapExperience() {
     return () => {
       cancelled = true;
       cleanupMapResume();
+      markerClusterRef.current?.clearMarkers();
+      markerClusterRef.current?.setMap(null);
+      markerClusterRef.current = null;
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
       mapRef.current = null;
@@ -304,9 +311,12 @@ export function MapExperience() {
     if (!map || !maps || !mapReady) return;
 
     const syncPandals = () => {
+      markerClusterRef.current?.clearMarkers();
+      markerClusterRef.current?.setMap(null);
+      markerClusterRef.current = null;
       markerRefs.current.forEach((marker) => marker.setMap(null));
-      markerRefs.current = visiblePandals.map((pandal) => {
-        const marker = createGoogleMarker(pandal, maps, map, compactViewport, (item) => {
+      const markers = visiblePandals.map((pandal) => {
+        const marker = createGoogleMarker(pandal, maps, compactViewport, (item) => {
           setSelected(item);
           setMobileListOpen(false);
           map.panTo(toMapPosition(item.coordinates));
@@ -314,6 +324,27 @@ export function MapExperience() {
         });
         return marker;
       });
+      markerRefs.current = markers;
+      markerClusterRef.current = new MarkerClusterer({
+        algorithm: new SuperClusterAlgorithm({ maxZoom: 16, radius: compactViewport ? 84 : 72 }),
+        map: map as never,
+        markers: markers as never[],
+        renderer: {
+          render: ({ count, position }) => {
+            const clusterSize = compactViewport ? 40 : 44;
+            return new maps.Marker({
+              icon: {
+                anchor: new maps.Point(clusterSize / 2, clusterSize / 2),
+                scaledSize: new maps.Size(clusterSize, clusterSize),
+                url: createClusterMarkerIcon(count),
+              },
+              position,
+              title: `${count} pandals nearby`,
+              zIndex: 1000 + count,
+            }) as never;
+          },
+        },
+      }) as DisposableMarkerClusterer;
     };
 
     syncPandals();
@@ -699,20 +730,48 @@ function toMapPosition(coordinates: [number, number]): MapPosition {
 function createGoogleMarker(
   pandal: Pandal,
   maps: GoogleMapsApi,
-  map: GoogleMapInstance,
   compactViewport: boolean,
   onSelect: (pandal: Pandal) => void,
 ) {
-  const markerSize = compactViewport ? 40 : 50;
+  const markerWidth = compactViewport ? 32 : 36;
+  const markerHeight = Math.round(markerWidth * 1.24);
   const marker = new maps.Marker({
     icon: {
-      scaledSize: new maps.Size(markerSize, markerSize),
-      url: pandal.image,
+      anchor: new maps.Point(markerWidth / 2, markerHeight),
+      scaledSize: new maps.Size(markerWidth, markerHeight),
+      url: createPandalMarkerIcon(pandal),
     },
-    map,
     position: toMapPosition(pandal.coordinates),
     title: pandal.name,
   });
   marker.addListener("click", () => onSelect(pandal));
   return marker;
+}
+
+function createPandalMarkerIcon(pandal: Pandal) {
+  const color = pandal.crowd === "High" ? "#d13f61" : pandal.crowd === "Moderate" ? "#e8792e" : "#168b7d";
+  const ecoBadge = pandal.eco ? '<circle cx="31" cy="8" r="5" fill="#35a85f" stroke="#fff" stroke-width="2" />' : "";
+  return toSvgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 50">
+      <path d="M20 1.5C9.8 1.5 2 9.3 2 19.1C2 32.2 20 48.5 20 48.5S38 32.2 38 19.1C38 9.3 30.2 1.5 20 1.5Z" fill="${color}" stroke="#fff" stroke-width="2.5" />
+      <circle cx="20" cy="19" r="10.5" fill="#fff" fill-opacity=".96" />
+      <text x="20" y="24" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="${color}">ग</text>
+      ${ecoBadge}
+    </svg>
+  `);
+}
+
+function createClusterMarkerIcon(count: number) {
+  return toSvgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="21" fill="#fff" stroke="#fff" stroke-width="5" />
+      <circle cx="24" cy="24" r="19" fill="#352f39" />
+      <circle cx="24" cy="24" r="16" fill="none" stroke="#f18a38" stroke-width="1.5" stroke-dasharray="3 3" />
+      <text x="24" y="29" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#fff">${count}</text>
+    </svg>
+  `);
+}
+
+function toSvgDataUrl(svg: string) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg.replace(/\s+/g, " ").trim())}`;
 }

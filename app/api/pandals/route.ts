@@ -3,6 +3,13 @@ import { desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db/runtime";
 import { pandals } from "@/db/schema";
+import {
+  consumeRateLimit,
+  getClientIdentifier,
+  hasValidImageSignature,
+  isSameOriginRequest,
+  rateLimitResponse,
+} from "@/lib/request-security.mjs";
 
 const validCrowd = new Set(["Low", "Moderate", "High"]);
 const validImages = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -40,7 +47,20 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const form = await request.formData();
+  if (!isSameOriginRequest(request)) {
+    return Response.json({ error: "Cross-site submissions are not allowed" }, { status: 403 });
+  }
+
+  const rateLimit = consumeRateLimit("pandal-upload", getClientIdentifier(request), 6, 10 * 60_000);
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
+
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > 8_500_000) {
+    return Response.json({ error: "The upload is too large" }, { status: 413 });
+  }
+
+  const form = await request.formData().catch(() => null);
+  if (!form) return Response.json({ error: "The submission could not be read" }, { status: 400 });
   const photo = form.get("photo");
   const name = String(form.get("name") ?? "").trim();
   const area = String(form.get("area") ?? "").trim();
@@ -53,8 +73,14 @@ export async function POST(request: Request) {
   if (!(photo instanceof File) || !validImages.has(photo.type) || photo.size > 8_000_000) {
     return Response.json({ error: "Add a JPG, PNG, or WebP photo under 8 MB" }, { status: 400 });
   }
+  if (!(await hasValidImageSignature(photo))) {
+    return Response.json({ error: "The uploaded file does not contain a valid image" }, { status: 400 });
+  }
   if (!name || !area || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
     return Response.json({ error: "Name, neighbourhood, and location are required" }, { status: 400 });
+  }
+  if (name.length > 100 || area.length > 100) {
+    return Response.json({ error: "Name and neighbourhood must be 100 characters or fewer" }, { status: 400 });
   }
   if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
     return Response.json({ error: "The captured location is not valid" }, { status: 400 });
@@ -95,8 +121,8 @@ export async function POST(request: Request) {
   try {
     await getDb().insert(pandals).values({
       id,
-      name: name.slice(0, 100),
-      area: area.slice(0, 100),
+      name,
+      area,
       longitude,
       latitude,
       imageKey,

@@ -6,8 +6,8 @@ The goal is to help people discover pandals, plan routes, share useful local det
 
 ## What Works Today
 
-- Interactive 3D-capable community map
-- Regional clustering and photo pins
+- Interactive Google Map with a festive custom style
+- Regional marker clustering and compact pandal pins
 - Searchable, responsive pandal directory
 - Eco-friendly badges and community crowd reports
 - Geolocated photo submissions
@@ -17,7 +17,7 @@ The goal is to help people discover pandals, plan routes, share useful local det
 ## Stack
 
 - Next.js 16 and React 19
-- MapLibre GL JS with OpenFreeMap tiles
+- Google Maps JavaScript API with Google MarkerClusterer
 - Next.js API routes deployed on Vercel
 - Neon Postgres provisioned through the Vercel Marketplace
 - Vercel Blob for uploaded photos
@@ -30,7 +30,7 @@ The goal is to help people discover pandals, plan routes, share useful local det
 - Node.js 22.13 or newer
 - npm
 
-No map API key is required. The API routes need a Postgres database and a Vercel Blob store.
+The map needs a browser-restricted Google Maps API key. The API routes need a Postgres database and a Vercel Blob store.
 
 ### Run Locally
 
@@ -60,6 +60,14 @@ If you are not linking the local checkout to Vercel, copy `.env.example` to `.en
 The `vercel-build` script runs `drizzle-kit migrate` before `next build`, so the Vercel build creates the schema on a new database and applies later migrations on every deployment. The `postgres` development dependency makes Drizzle Kit use its standard PostgreSQL driver for CLI/CI migrations; the app itself continues to use Neon’s HTTP driver at runtime. Vercel’s Marketplace provisions the database; the repository provisions its tables through Drizzle migrations.
 
 The GitHub workflow at `.github/workflows/vercel.yml` runs lint and tests for pull requests and pushes. It uses `vercel deploy` without `--prebuilt`, so Vercel performs the build with its sensitive environment variables available and runs `drizzle-kit migrate` before the Next.js build. It creates preview deployments for pull requests from this repository and production deployments for pushes to `main`. Fork pull requests are validated but are not deployed because GitHub does not expose repository secrets to them. If Vercel’s native Git integration is enabled for this repository, disable one of the two deployment mechanisms to avoid duplicate deployments.
+
+### Security
+
+- Keep `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `PANDAL_ADMIN_KEY`, and Vercel deployment values server-side. Only `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and `NEXT_PUBLIC_SITE_URL` are intentionally public.
+- Restrict the Google Maps key to the production hostname, approved preview hostnames if needed, localhost for development, and the Maps JavaScript API only.
+- Public write routes enforce same-origin browser requests, bounded request sizes, burst throttling, and image-file signature validation. The admin key is checked with a timing-safe comparison and failed attempts are throttled.
+- The Blob token is never sent to browsers. The current store is public because approved photos must render publicly. Pending photo URLs are random and are not listed by the public API, but anyone who obtains an exact Blob URL can still view it. Use a private Blob store plus an authenticated image proxy if pending submissions require strict confidentiality.
+- Dependency scanning runs in GitHub Actions. Run `npm audit` locally before releases; the committed lockfile and package overrides keep the current audit at zero known vulnerabilities.
 
 ### Local Data
 

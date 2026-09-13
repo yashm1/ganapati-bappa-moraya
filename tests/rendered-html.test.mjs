@@ -35,6 +35,9 @@ test("server-renders the Bappa Map product", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.match(response.headers.get("permissions-policy") ?? "", /geolocation=\(self\)/);
 
   const html = await response.text();
   assert.match(html, /<title>Bappa Map \| Community Pandal Guide<\/title>/i);
@@ -45,8 +48,9 @@ test("server-renders the Bappa Map product", async () => {
 });
 
 test("ships map, persistence, and upload capabilities without starter residue", async () => {
-  const [page, mapExperience, pandalRoute, adminPage, adminRoute, adminStatusRoute, vercelConfig, workflow, packageJson] = await Promise.all([
+  const [page, layout, mapExperience, pandalRoute, adminPage, adminRoute, adminStatusRoute, vercelConfig, workflow, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/map-experience.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pandals/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
@@ -58,6 +62,8 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   ]);
 
   assert.match(page, /MapExperience/);
+  assert.doesNotMatch(layout, /x-forwarded-host|headers\(\)/);
+  assert.match(layout, /VERCEL_PROJECT_PRODUCTION_URL/);
   assert.doesNotMatch(mapExperience, /openfreemap|openmaptiles|maplibre/i);
   assert.match(mapExperience, /NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/);
   assert.match(mapExperience, /google\.com\/maps\/dir/);
@@ -69,7 +75,9 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /installMapResumeHandler/);
   assert.match(mapExperience, /mobile-action-dock/);
   assert.match(mapExperience, /GOOGLE_MAP_STYLES/);
-  assert.match(mapExperience, /compactViewport \? 40 : 50/);
+  assert.match(mapExperience, /MarkerClusterer/);
+  assert.match(mapExperience, /SuperClusterAlgorithm/);
+  assert.match(mapExperience, /compactViewport \? 32 : 36/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
   assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);
   assert.match(pandalRoute, /Photo storage is not configured/);

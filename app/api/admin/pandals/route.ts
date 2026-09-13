@@ -35,5 +35,5 @@ export async function GET(request: Request) {
       eco: Boolean(row.eco),
       createdAt: row.createdAt,
     })),
-  });
+  }, { headers: { "cache-control": "private, no-store" } });
 }

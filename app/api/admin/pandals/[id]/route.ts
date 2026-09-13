@@ -32,5 +32,8 @@ export async function PATCH(
 
   if (body.status === "rejected") await del(pandal.imageUrl).catch(() => undefined);
 
-  return Response.json({ ok: true, status: body.status });
+  return Response.json(
+    { ok: true, status: body.status },
+    { headers: { "cache-control": "private, no-store" } },
+  );
 }
