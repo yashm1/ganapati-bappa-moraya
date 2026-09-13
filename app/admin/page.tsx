@@ -8,6 +8,7 @@ type PendingPandal = {
   id: string;
   name: string;
   area: string;
+  description: string;
   coordinates: [number, number];
   image: string;
   crowd: string;
@@ -138,6 +139,7 @@ export default function AdminPage() {
                           <div>
                             <h2>{pandal.name}</h2>
                             <p>{pandal.area} · {pandal.crowd} crowd{pandal.eco ? " · Eco-friendly" : ""}</p>
+                            {pandal.description && <span className="approval-description">{pandal.description}</span>}
                           </div>
                           <a href={`https://www.google.com/maps/search/?api=1&query=${pandal.coordinates[1]},${pandal.coordinates[0]}`} target="_blank" rel="noreferrer" aria-label={`Open ${pandal.name} location`}>
                             <ExternalLink size={17} />

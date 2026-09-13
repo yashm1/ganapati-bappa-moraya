@@ -6,6 +6,7 @@ export const pandals = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     area: text("area").notNull(),
+    description: text("description").notNull().default(""),
     longitude: real("longitude").notNull(),
     latitude: real("latitude").notNull(),
     imageKey: text("image_key").notNull(),

@@ -20,6 +20,7 @@ export async function GET() {
       id: pandals.id,
       name: pandals.name,
       area: pandals.area,
+      description: pandals.description,
       longitude: pandals.longitude,
       latitude: pandals.latitude,
       imageUrl: pandals.imageUrl,
@@ -41,7 +42,7 @@ export async function GET() {
       wait: row.crowd === "Low" ? "5-10 min" : row.crowd === "High" ? "45+ min" : "20-30 min",
       eco: Boolean(row.eco),
       distance: "Community submission",
-      description: "A community-submitted pandal shared by local devotees.",
+      description: row.description || "A community-submitted pandal shared by local devotees.",
     })),
   });
 }
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
   const photo = form.get("photo");
   const name = String(form.get("name") ?? "").trim();
   const area = String(form.get("area") ?? "").trim();
+  const description = String(form.get("description") ?? "").trim();
   const longitude = Number(form.get("longitude"));
   const latitude = Number(form.get("latitude"));
   const eco = form.get("eco") === "true";
@@ -76,11 +78,14 @@ export async function POST(request: Request) {
   if (!(await hasValidImageSignature(photo))) {
     return Response.json({ error: "The uploaded file does not contain a valid image" }, { status: 400 });
   }
-  if (!name || !area || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-    return Response.json({ error: "Name, neighbourhood, and location are required" }, { status: 400 });
+  if (!name || !area || !description || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    return Response.json({ error: "Name, neighbourhood, description, and location are required" }, { status: 400 });
   }
   if (name.length > 100 || area.length > 100) {
     return Response.json({ error: "Name and neighbourhood must be 100 characters or fewer" }, { status: 400 });
+  }
+  if (description.length > 320) {
+    return Response.json({ error: "Description must be 320 characters or fewer" }, { status: 400 });
   }
   if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
     return Response.json({ error: "The captured location is not valid" }, { status: 400 });
@@ -123,6 +128,7 @@ export async function POST(request: Request) {
       id,
       name,
       area,
+      description,
       longitude,
       latitude,
       imageKey,
@@ -151,7 +157,7 @@ export async function POST(request: Request) {
       wait: crowd === "Low" ? "5-10 min" : crowd === "High" ? "45+ min" : "20-30 min",
       eco,
       distance: "Just added",
-      description: "A community-submitted pandal awaiting a quick accuracy check.",
+      description,
     },
     status: "pending",
   });

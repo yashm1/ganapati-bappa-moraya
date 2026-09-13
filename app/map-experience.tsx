@@ -882,6 +882,18 @@ export function MapExperience() {
                 </label>
               </div>
 
+              <label className="form-field">
+                <span>Description</span>
+                <textarea
+                  name="description"
+                  required
+                  maxLength={320}
+                  rows={4}
+                  placeholder="Share what makes this pandal special"
+                />
+                <small className="field-hint">A short note visitors will see on the pandal card.</small>
+              </label>
+
               <button className={`location-capture ${uploadLocation ? "captured" : ""}`} type="button" onClick={captureUploadLocation}>
                 {uploadLocation ? <Check size={18} /> : <MapPin size={18} />}
                 <span><strong>{uploadLocation ? "Location captured" : "Use my current location"}</strong><small>{uploadLocation ? "The new pin is ready" : "Used only to place this pandal"}</small></span>
