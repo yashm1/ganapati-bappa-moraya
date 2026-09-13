@@ -177,6 +177,14 @@ const GOOGLE_MAP_STYLES = [
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#246b78" }] },
 ];
 
+const CLUSTER_MARKER_ICON = toSvgDataUrl(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+    <circle cx="24" cy="24" r="21" fill="#fff" stroke="#fff" stroke-width="5" />
+    <circle cx="24" cy="24" r="19" fill="#352f39" />
+    <circle cx="24" cy="24" r="16" fill="none" stroke="#f18a38" stroke-width="1.5" stroke-dasharray="3 3" />
+  </svg>
+`);
+
 export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
@@ -336,8 +344,16 @@ export function MapExperience() {
               icon: {
                 anchor: new maps.Point(clusterSize / 2, clusterSize / 2),
                 scaledSize: new maps.Size(clusterSize, clusterSize),
-                url: createClusterMarkerIcon(count),
+                url: CLUSTER_MARKER_ICON,
               },
+              label: {
+                color: "#fff",
+                fontFamily: "Arial, sans-serif",
+                fontSize: "14px",
+                fontWeight: "700",
+                text: String(count),
+              },
+              optimized: true,
               position,
               title: `${count} pandals nearby`,
               zIndex: 1000 + count,
@@ -744,17 +760,6 @@ function createGoogleMarker(
   });
   marker.addListener("click", () => onSelect(pandal));
   return marker;
-}
-
-function createClusterMarkerIcon(count: number) {
-  return toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-      <circle cx="24" cy="24" r="21" fill="#fff" stroke="#fff" stroke-width="5" />
-      <circle cx="24" cy="24" r="19" fill="#352f39" />
-      <circle cx="24" cy="24" r="16" fill="none" stroke="#f18a38" stroke-width="1.5" stroke-dasharray="3 3" />
-      <text x="24" y="29" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#fff">${count}</text>
-    </svg>
-  `);
 }
 
 function toSvgDataUrl(svg: string) {
