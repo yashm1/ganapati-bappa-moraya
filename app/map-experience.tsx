@@ -177,13 +177,41 @@ const GOOGLE_MAP_STYLES = [
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#246b78" }] },
 ];
 
-const CLUSTER_MARKER_ICON = toSvgDataUrl(`
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-    <circle cx="24" cy="24" r="21" fill="#fff" stroke="#fff" stroke-width="5" />
-    <circle cx="24" cy="24" r="19" fill="#352f39" />
-    <circle cx="24" cy="24" r="16" fill="none" stroke="#f18a38" stroke-width="1.5" stroke-dasharray="3 3" />
-  </svg>
-`);
+const MUMBAI_CENTER: MapPosition = { lat: 18.995, lng: 72.836 };
+
+const INDIA_BOUNDS = { north: 35.5, south: 6.5, west: 68.0, east: 97.5 };
+
+function isInsideIndia(lat: number, lng: number): boolean {
+  return lat >= INDIA_BOUNDS.south && lat <= INDIA_BOUNDS.north &&
+    lng >= INDIA_BOUNDS.west && lng <= INDIA_BOUNDS.east;
+}
+
+type ClusterTier = "small" | "medium" | "large";
+
+function getClusterTier(count: number): ClusterTier {
+  if (count <= 5) return "small";
+  if (count <= 20) return "medium";
+  return "large";
+}
+
+const CLUSTER_TIER_CONFIG: Record<ClusterTier, { size: number; fontSize: string; ringColor: string; bgColor: string }> = {
+  small:  { size: 42, fontSize: "13px", ringColor: "#0f9f91", bgColor: "#1a3a35" },
+  medium: { size: 50, fontSize: "14px", ringColor: "#f18a38", bgColor: "#3a2a1a" },
+  large:  { size: 58, fontSize: "15px", ringColor: "#db2777", bgColor: "#3a1a2a" },
+};
+
+function buildClusterIcon(count: number): string {
+  const tier = getClusterTier(count);
+  const { ringColor, bgColor } = CLUSTER_TIER_CONFIG[tier];
+  return toSvgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">
+      <circle cx="28" cy="28" r="26" fill="#fff" stroke="#fff" stroke-width="4" />
+      <circle cx="28" cy="28" r="24" fill="${bgColor}" />
+      <circle cx="28" cy="28" r="20" fill="none" stroke="${ringColor}" stroke-width="2" stroke-dasharray="4 3" opacity=".85" />
+      <circle cx="28" cy="28" r="24" fill="none" stroke="${ringColor}" stroke-width="1" opacity=".3" />
+    </svg>
+  `);
+}
 
 export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -277,7 +305,7 @@ export function MapExperience() {
 
         const map = new maps.Map(mapContainer.current, {
           backgroundColor: "#f7ead7",
-          center: { lat: 18.995, lng: 72.836 },
+          center: MUMBAI_CENTER,
           clickableIcons: false,
           controlSize: 32,
           fullscreenControl: false,
@@ -313,6 +341,42 @@ export function MapExperience() {
     };
   }, []);
 
+  // --- IP-based geolocation: center map on user's approximate location ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 5000);
+
+    fetch("https://ipapi.co/json/", { signal: abortController.signal })
+      .then(async (response) => {
+        const data = await response.json() as { latitude?: number; longitude?: number; country_code?: string };
+        clearTimeout(timeout);
+        if (abortController.signal.aborted) return;
+
+        const lat = data.latitude;
+        const lng = data.longitude;
+
+        if (lat != null && lng != null && isInsideIndia(lat, lng)) {
+          map.panTo({ lat, lng });
+          map.setZoom(13);
+        }
+        // If outside India or missing coords → stay on Mumbai (already the default center)
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        // Silently fall back to Mumbai — no disruption
+      });
+
+    return () => {
+      clearTimeout(timeout);
+      abortController.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]);
+
+  // --- Sync markers & clusters whenever pandals or viewport change ---
   useEffect(() => {
     const map = mapRef.current;
     const maps = mapsApiRef.current;
@@ -334,28 +398,43 @@ export function MapExperience() {
       });
       markerRefs.current = markers;
       markerClusterRef.current = new MarkerClusterer({
-        algorithm: new SuperClusterAlgorithm({ maxZoom: 16, radius: compactViewport ? 84 : 72 }),
+        algorithm: new SuperClusterAlgorithm({
+          maxZoom: 17,
+          radius: compactViewport ? 100 : 90,
+          minPoints: 2,
+        }),
         map: map as never,
         markers: markers as never[],
+        onClusterClick: (_event: unknown, cluster: { position: MapPosition; count: number; bounds?: GoogleBounds }) => {
+          if (cluster.bounds && !cluster.bounds.isEmpty()) {
+            map.fitBounds(cluster.bounds, { top: 80, bottom: 120, left: 40, right: 40 });
+          } else {
+            map.panTo(cluster.position);
+            const currentZoom = map.getZoom() ?? 14;
+            map.setZoom(Math.min(currentZoom + 2, 18));
+          }
+        },
         renderer: {
           render: ({ count, position }) => {
-            const clusterSize = compactViewport ? 40 : 44;
+            const tier = getClusterTier(count);
+            const config = CLUSTER_TIER_CONFIG[tier];
+            const clusterSize = compactViewport ? Math.round(config.size * 0.88) : config.size;
             return new maps.Marker({
               icon: {
                 anchor: new maps.Point(clusterSize / 2, clusterSize / 2),
                 scaledSize: new maps.Size(clusterSize, clusterSize),
-                url: CLUSTER_MARKER_ICON,
+                url: buildClusterIcon(count),
               },
               label: {
                 color: "#fff",
                 fontFamily: "Arial, sans-serif",
-                fontSize: "14px",
+                fontSize: config.fontSize,
                 fontWeight: "700",
                 text: String(count),
               },
               optimized: true,
               position,
-              title: `${count} pandals nearby`,
+              title: `${count} pandals nearby — tap to explore`,
               zIndex: 1000 + count,
             }) as never;
           },
