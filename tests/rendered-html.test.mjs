@@ -66,6 +66,8 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(layout, /VERCEL_PROJECT_PRODUCTION_URL/);
   assert.doesNotMatch(mapExperience, /openfreemap|openmaptiles|maplibre/i);
   assert.match(mapExperience, /NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/);
+  assert.match(mapExperience, /center: MUMBAI_CENTER/);
+  assert.doesNotMatch(mapExperience, /ipapi\.co/);
   assert.match(mapExperience, /google\.com\/maps\/dir/);
   assert.match(mapExperience, /noopener noreferrer/);
   assert.match(mapExperience, /api\/pandals/);
@@ -78,7 +80,7 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /MarkerClusterer/);
   assert.match(mapExperience, /SuperClusterAlgorithm/);
   assert.match(mapExperience, /compactViewport \? 28 : 34/);
-  assert.match(mapExperience, /url: PANDAL_MARKER_ICON/);
+  assert.match(mapExperience, /url: pandal\.image/);
   assert.doesNotMatch(mapExperience, /createPandalMarkerIcon/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
   assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);

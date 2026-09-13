@@ -35,7 +35,6 @@ type GoogleMapInstance = {
   panTo: (position: MapPosition) => void;
   setCenter: (position: MapPosition) => void;
   setZoom: (zoom: number) => void;
-  addListener?: (event: string, handler: () => void) => { remove: () => void };
   setOptions?: (options: Record<string, unknown>) => void;
 };
 type GoogleMarkerInstance = {
@@ -182,13 +181,6 @@ const GOOGLE_MAP_STYLES = [
 
 const MUMBAI_CENTER: MapPosition = { lat: 18.995, lng: 72.836 };
 
-const INDIA_BOUNDS = { north: 35.5, south: 6.5, west: 68.0, east: 97.5 };
-
-function isInsideIndia(lat: number, lng: number): boolean {
-  return lat >= INDIA_BOUNDS.south && lat <= INDIA_BOUNDS.north &&
-    lng >= INDIA_BOUNDS.west && lng <= INDIA_BOUNDS.east;
-}
-
 const CLUSTER_MARKER_ICON = toSvgDataUrl(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
     <circle cx="24" cy="24" r="21" fill="#fff" stroke="#fff" stroke-width="5" />
@@ -197,23 +189,10 @@ const CLUSTER_MARKER_ICON = toSvgDataUrl(`
   </svg>
 `);
 
-const PANDAL_MARKER_ICON = toSvgDataUrl(`
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-    <path d="M24 46C20 40 10 32 10 21a14 14 0 1 1 28 0c0 11-10 19-14 25Z" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
-    <circle cx="24" cy="20" r="13" fill="#e85d2a" />
-    <path d="M17 19c-4-3-7-1-7 3s3 6 7 5M31 19c4-3 7-1 7 3s-3 6-7 5" fill="none" stroke="#fff5e9" stroke-width="3" stroke-linecap="round" />
-    <circle cx="20" cy="19" r="1.6" fill="#fff" />
-    <circle cx="28" cy="19" r="1.6" fill="#fff" />
-    <path d="M24 19v9c0 3-2 5-4 5M24 28c0 3 2 5 4 5" fill="none" stroke="#fff5e9" stroke-width="2.4" stroke-linecap="round" />
-    <path d="M18 14c2-3 4-4 6-4s4 1 6 4" fill="none" stroke="#fff5e9" stroke-width="2" stroke-linecap="round" />
-  </svg>
-`);
-
 export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
   const mapsApiRef = useRef<GoogleMapsApi | null>(null);
-  const mapInteractionRef = useRef(false);
   const markerRefs = useRef<GoogleMarkerInstance[]>([]);
   const markerClusterRef = useRef<DisposableMarkerClusterer | null>(null);
   const [pandals, setPandals] = useState(PANDALS);
@@ -335,7 +314,6 @@ export function MapExperience() {
     if (!mapContainer.current || mapRef.current) return;
     let cancelled = false;
     let cleanupMapResume: () => void = () => undefined;
-    let cleanupMapInteraction: () => void = () => undefined;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
     loadGoogleMaps(apiKey ?? "", window)
@@ -358,11 +336,6 @@ export function MapExperience() {
 
         mapRef.current = map;
         mapsApiRef.current = maps;
-        mapInteractionRef.current = false;
-        const interactionListeners = ["click", "dragstart", "zoom_changed"]
-          .map((event) => map.addListener?.(event, () => { mapInteractionRef.current = true; }))
-          .filter((listener): listener is { remove: () => void } => Boolean(listener));
-        cleanupMapInteraction = () => interactionListeners.forEach((listener) => listener.remove());
         cleanupMapResume = installMapResumeHandler(() => maps.event.trigger(map, "resize"));
         setMapNotice("");
         setMapReady(true);
@@ -373,7 +346,6 @@ export function MapExperience() {
 
     return () => {
       cancelled = true;
-      cleanupMapInteraction();
       cleanupMapResume();
       markerClusterRef.current?.clearMarkers();
       markerClusterRef.current?.setMap(null);
@@ -385,40 +357,6 @@ export function MapExperience() {
       setMapReady(false);
     };
   }, []);
-
-  // --- IP-based geolocation: center map on user's approximate location ---
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-
-    const abortController = new AbortController();
-    const timeout = setTimeout(() => abortController.abort(), 5000);
-
-    fetch("https://ipapi.co/json/", { signal: abortController.signal })
-      .then(async (response) => {
-        const data = await response.json() as { latitude?: number; longitude?: number; country_code?: string };
-        clearTimeout(timeout);
-        if (abortController.signal.aborted) return;
-
-        const lat = data.latitude;
-        const lng = data.longitude;
-
-        if (!mapInteractionRef.current && lat != null && lng != null && isInsideIndia(lat, lng)) {
-          map.panTo({ lat, lng });
-          map.setZoom(13);
-        }
-        // If outside India or missing coords → stay on Mumbai (already the default center)
-      })
-      .catch(() => {
-        clearTimeout(timeout);
-        // Silently fall back to Mumbai — no disruption
-      });
-
-    return () => {
-      clearTimeout(timeout);
-      abortController.abort();
-    };
-  }, [mapReady]);
 
   // --- Sync markers & clusters whenever pandals or viewport change ---
   useEffect(() => {
@@ -970,7 +908,7 @@ function createGoogleMarker(
       anchor: new maps.Point(markerSize / 2, markerSize),
       origin: new maps.Point(0, 0),
       scaledSize: new maps.Size(markerSize, markerSize),
-      url: PANDAL_MARKER_ICON,
+      url: pandal.image,
     },
     optimized: true,
     position: toMapPosition(pandal.coordinates),
