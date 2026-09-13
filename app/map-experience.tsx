@@ -35,6 +35,7 @@ type GoogleMapInstance = {
   panTo: (position: MapPosition) => void;
   setCenter: (position: MapPosition) => void;
   setZoom: (zoom: number) => void;
+  addListener?: (event: string, handler: () => void) => { remove: () => void };
   setOptions?: (options: Record<string, unknown>) => void;
 };
 type GoogleMarkerInstance = {
@@ -200,6 +201,7 @@ export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
   const mapsApiRef = useRef<GoogleMapsApi | null>(null);
+  const mapInteractionRef = useRef(false);
   const markerRefs = useRef<GoogleMarkerInstance[]>([]);
   const markerClusterRef = useRef<DisposableMarkerClusterer | null>(null);
   const [pandals, setPandals] = useState(PANDALS);
@@ -321,6 +323,7 @@ export function MapExperience() {
     if (!mapContainer.current || mapRef.current) return;
     let cancelled = false;
     let cleanupMapResume: () => void = () => undefined;
+    let cleanupMapInteraction: () => void = () => undefined;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
     loadGoogleMaps(apiKey ?? "", window)
@@ -343,6 +346,11 @@ export function MapExperience() {
 
         mapRef.current = map;
         mapsApiRef.current = maps;
+        mapInteractionRef.current = false;
+        const interactionListeners = ["click", "dragstart", "zoom_changed"]
+          .map((event) => map.addListener?.(event, () => { mapInteractionRef.current = true; }))
+          .filter((listener): listener is { remove: () => void } => Boolean(listener));
+        cleanupMapInteraction = () => interactionListeners.forEach((listener) => listener.remove());
         cleanupMapResume = installMapResumeHandler(() => maps.event.trigger(map, "resize"));
         setMapNotice("");
         setMapReady(true);
@@ -353,6 +361,7 @@ export function MapExperience() {
 
     return () => {
       cancelled = true;
+      cleanupMapInteraction();
       cleanupMapResume();
       markerClusterRef.current?.clearMarkers();
       markerClusterRef.current?.setMap(null);
@@ -382,7 +391,7 @@ export function MapExperience() {
         const lat = data.latitude;
         const lng = data.longitude;
 
-        if (lat != null && lng != null && isInsideIndia(lat, lng)) {
+        if (!mapInteractionRef.current && lat != null && lng != null && isInsideIndia(lat, lng)) {
           map.panTo({ lat, lng });
           map.setZoom(13);
         }
