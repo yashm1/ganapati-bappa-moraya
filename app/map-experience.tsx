@@ -197,6 +197,18 @@ const CLUSTER_MARKER_ICON = toSvgDataUrl(`
   </svg>
 `);
 
+const PANDAL_MARKER_ICON = toSvgDataUrl(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+    <path d="M24 46C20 40 10 32 10 21a14 14 0 1 1 28 0c0 11-10 19-14 25Z" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
+    <circle cx="24" cy="20" r="13" fill="#e85d2a" />
+    <path d="M17 19c-4-3-7-1-7 3s3 6 7 5M31 19c4-3 7-1 7 3s-3 6-7 5" fill="none" stroke="#fff5e9" stroke-width="3" stroke-linecap="round" />
+    <circle cx="20" cy="19" r="1.6" fill="#fff" />
+    <circle cx="28" cy="19" r="1.6" fill="#fff" />
+    <path d="M24 19v9c0 3-2 5-4 5M24 28c0 3 2 5 4 5" fill="none" stroke="#fff5e9" stroke-width="2.4" stroke-linecap="round" />
+    <path d="M18 14c2-3 4-4 6-4s4 1 6 4" fill="none" stroke="#fff5e9" stroke-width="2" stroke-linecap="round" />
+  </svg>
+`);
+
 export function MapExperience() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
@@ -958,7 +970,7 @@ function createGoogleMarker(
       anchor: new maps.Point(markerSize / 2, markerSize),
       origin: new maps.Point(0, 0),
       scaledSize: new maps.Size(markerSize, markerSize),
-      url: createStableMarkerIcon(pandal.image),
+      url: PANDAL_MARKER_ICON,
     },
     optimized: true,
     position: toMapPosition(pandal.coordinates),
@@ -966,28 +978,6 @@ function createGoogleMarker(
   });
   marker.addListener("click", () => onSelect(pandal));
   return marker;
-}
-
-function createStableMarkerIcon(image: string) {
-  const imageUrl = image.startsWith("http") || image.startsWith("data:")
-    ? image
-    : new URL(image, window.location.origin).toString();
-  const escapedImageUrl = escapeSvgAttribute(imageUrl);
-
-  return toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-      <defs>
-        <clipPath id="pandal-photo"><circle cx="24" cy="21" r="12" /></clipPath>
-      </defs>
-      <path d="M24 46C20 40 10 32 10 21a14 14 0 1 1 28 0c0 11-10 19-14 25Z" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
-      <image href="${escapedImageUrl}" x="12" y="9" width="24" height="24" preserveAspectRatio="xMidYMid slice" clip-path="url(#pandal-photo)" />
-      <circle cx="24" cy="21" r="12" fill="none" stroke="#e85d2a" stroke-width="2" />
-    </svg>
-  `);
-}
-
-function escapeSvgAttribute(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function toSvgDataUrl(svg: string) {
