@@ -78,7 +78,7 @@ test("ships map, persistence, and upload capabilities without starter residue", 
   assert.match(mapExperience, /MarkerClusterer/);
   assert.match(mapExperience, /SuperClusterAlgorithm/);
   assert.match(mapExperience, /compactViewport \? 28 : 34/);
-  assert.match(mapExperience, /url: pandal\.image/);
+  assert.match(mapExperience, /createStableMarkerIcon\(pandal\.image\)/);
   assert.doesNotMatch(mapExperience, /createPandalMarkerIcon/);
   assert.match(pandalRoute, /eq\(pandals\.status, "approved"\)/);
   assert.match(pandalRoute, /BLOB_READ_WRITE_TOKEN/);

@@ -423,8 +423,15 @@ export function MapExperience() {
         const marker = createGoogleMarker(pandal, maps, compactViewport, (item) => {
           setSelected(item);
           setMobileListOpen(false);
+          if (map.setOptions) {
+            map.setOptions({
+              padding: compactViewport
+                ? { top: 60, bottom: 250, left: 16, right: 16 }
+                : { top: 90, bottom: 30, left: 380, right: 30 },
+            });
+          }
           map.panTo(toMapPosition(item.coordinates));
-          map.setZoom(15);
+          if ((map.getZoom() ?? 14) < 15) map.setZoom(15);
         });
         return marker;
       });
@@ -949,11 +956,9 @@ function createGoogleMarker(
   const marker = new maps.Marker({
     icon: {
       anchor: new maps.Point(markerSize / 2, markerSize),
-      // Declare the image origin as well as its anchor so Google Maps does
-      // not infer sprite geometry again while tiles are being refreshed.
       origin: new maps.Point(0, 0),
       scaledSize: new maps.Size(markerSize, markerSize),
-      url: pandal.image,
+      url: createStableMarkerIcon(pandal.image),
     },
     optimized: true,
     position: toMapPosition(pandal.coordinates),
@@ -961,6 +966,28 @@ function createGoogleMarker(
   });
   marker.addListener("click", () => onSelect(pandal));
   return marker;
+}
+
+function createStableMarkerIcon(image: string) {
+  const imageUrl = image.startsWith("http") || image.startsWith("data:")
+    ? image
+    : new URL(image, window.location.origin).toString();
+  const escapedImageUrl = escapeSvgAttribute(imageUrl);
+
+  return toSvgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+      <defs>
+        <clipPath id="pandal-photo"><circle cx="24" cy="21" r="12" /></clipPath>
+      </defs>
+      <path d="M24 46C20 40 10 32 10 21a14 14 0 1 1 28 0c0 11-10 19-14 25Z" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
+      <image href="${escapedImageUrl}" x="12" y="9" width="24" height="24" preserveAspectRatio="xMidYMid slice" clip-path="url(#pandal-photo)" />
+      <circle cx="24" cy="21" r="12" fill="none" stroke="#e85d2a" stroke-width="2" />
+    </svg>
+  `);
+}
+
+function escapeSvgAttribute(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function toSvgDataUrl(svg: string) {
