@@ -40,10 +40,11 @@ test("server-renders the Bappa Map product", async () => {
   assert.match(response.headers.get("permissions-policy") ?? "", /geolocation=\(self\)/);
 
   const html = await response.text();
-  assert.match(html, /<title>Bappa Map \| Community Pandal Guide<\/title>/i);
+  assert.match(html, /<title>Bappa Map \| Pandals of India<\/title>/i);
   assert.match(html, /Bappa Map/);
   assert.match(html, /Explore pandals/);
   assert.match(html, /Lalbaugcha Raja/);
+  assert.doesNotMatch(html, /<link rel="preload" as="image" href="\/pandals\//i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
