@@ -40,18 +40,40 @@ test("server-renders the Bappa Map product", async () => {
   assert.match(response.headers.get("permissions-policy") ?? "", /geolocation=\(self\)/);
 
   const html = await response.text();
-  assert.match(html, /<title>Bappa Map \| Pandals of India<\/title>/i);
+  assert.match(html, /<title>Find Ganesh Pandals in Mumbai &amp; India \| Bappa Map<\/title>/i);
+  assert.match(html, /<meta name="description" content="Find Ganesh Chaturthi pandals in Mumbai and across India, compare crowd levels, and plan your pandal-hopping route\."\/>/i);
+  assert.match(html, /<link rel="canonical" href="http:\/\/localhost:3000\/?"\/>/i);
   assert.match(html, /Bappa Map/);
-  assert.match(html, /Explore pandals/);
+  assert.match(html, /Explore pandals in Mumbai/);
+  assert.match(html, /application\/ld\+json/);
   assert.match(html, /Lalbaugcha Raja/);
   assert.doesNotMatch(html, /<link rel="preload" as="image" href="\/pandals\//i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
+test("publishes crawlable SEO routes", async () => {
+  const [robots, sitemap, adminLayout] = await Promise.all([
+    fetch(`http://127.0.0.1:${port}/robots.txt`),
+    fetch(`http://127.0.0.1:${port}/sitemap.xml`),
+    readFile(new URL("../app/admin/layout.tsx", import.meta.url), "utf8"),
+  ]);
+  const robotsText = await robots.text();
+  const sitemapText = await sitemap.text();
+
+  assert.equal(robots.status, 200);
+  assert.match(robotsText, /Disallow: \/admin/);
+  assert.match(robotsText, /Disallow: \/api\//);
+  assert.match(robotsText, /Sitemap: .*\/sitemap\.xml/);
+  assert.equal(sitemap.status, 200);
+  assert.match(sitemapText, /<loc>http:\/\/localhost:3000<\/loc>/);
+  assert.match(adminLayout, /index: false/);
+});
+
 test("ships map, persistence, and upload capabilities without starter residue", async () => {
-  const [page, layout, mapExperience, pandalRoute, adminPage, adminRoute, adminStatusRoute, vercelConfig, workflow, packageJson] = await Promise.all([
+  const [page, layout, siteOrigin, mapExperience, pandalRoute, adminPage, adminRoute, adminStatusRoute, vercelConfig, workflow, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/site-origin.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/map-experience.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/pandals/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
@@ -64,7 +86,7 @@ test("ships map, persistence, and upload capabilities without starter residue", 
 
   assert.match(page, /MapExperience/);
   assert.doesNotMatch(layout, /x-forwarded-host|headers\(\)/);
-  assert.match(layout, /VERCEL_PROJECT_PRODUCTION_URL/);
+  assert.match(siteOrigin, /VERCEL_PROJECT_PRODUCTION_URL/);
   assert.doesNotMatch(mapExperience, /openfreemap|openmaptiles|maplibre/i);
   assert.match(mapExperience, /NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/);
   assert.match(mapExperience, /center: MUMBAI_CENTER/);

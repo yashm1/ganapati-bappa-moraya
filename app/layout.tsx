@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { getSiteOrigin, siteDescription } from "@/lib/site-origin";
 import "./globals.css";
 
 const geist = Geist({
@@ -13,35 +14,40 @@ export function generateMetadata(): Metadata {
 
   return {
     metadataBase: new URL(origin),
-    title: "Bappa Map | Pandals of India",
-    description:
-      "Discover Ganapati pandals across India, check live crowd levels, and share a pandal near you.",
+    title: {
+      default: "Find Ganesh Pandals in Mumbai & India | Bappa Map",
+      template: "%s | Bappa Map",
+    },
+    description: siteDescription,
+    alternates: { canonical: "/" },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+        "max-video-preview": -1,
+      },
+    },
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "Bappa Map — Pandals of India",
-      description: "Discover Ganapati pandals across India with Bappa Map.",
-      images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "Bappa Map — Pandals of India" }],
+      title: "Find Ganesh Pandals in Mumbai & India | Bappa Map",
+      description: siteDescription,
+      url: origin,
+      siteName: "Bappa Map",
+      locale: "en_IN",
+      images: [{ url: "/og.png", width: 1672, height: 941, alt: "Bappa Map — Ganesh pandal map" }],
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "Bappa Map — Pandals of India",
-      description: "Discover Ganapati pandals across India with Bappa Map.",
-      images: [`${origin}/og.png`],
+      title: "Find Ganesh Pandals in Mumbai & India | Bappa Map",
+      description: siteDescription,
+      images: ["/og.png"],
     },
   };
-}
-
-function getSiteOrigin() {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  if (!configured) return "http://localhost:3000";
-
-  try {
-    const url = new URL(configured.startsWith("http") ? configured : `https://${configured}`);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : "http://localhost:3000";
-  } catch {
-    return "http://localhost:3000";
-  }
 }
 
 export default function RootLayout({
@@ -50,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en-IN">
       <head>
         <link rel="preconnect" href="https://maps.googleapis.com" />
         <link rel="preconnect" href="https://maps.gstatic.com" crossOrigin="anonymous" />

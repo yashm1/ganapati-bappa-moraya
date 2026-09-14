@@ -30,6 +30,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { 
 .directory-handle { width:32px; height:3px; margin:0 auto 16px; background:#d5dcd7; border-radius:3px; }
 .directory-heading { display:flex; justify-content:space-between; align-items:center; }
 .directory h1 { margin:4px 0 0; font-size:22px; font-weight:600; }
+.directory-intro { max-width:31rem; margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.45; }
 .close-mobile,.detail-close,.modal-close { display:grid; place-items:center; flex-shrink:0; width:44px; height:44px; border:1px solid var(--line); border-radius:50%; background:#fffffff5; }
 .filter-strip { display:flex; gap:8px; padding:16px 0 12px; overflow-x:auto; flex-shrink:0; scrollbar-width:none; -webkit-overflow-scrolling:touch; align-items:center; }
 .filter-strip::-webkit-scrollbar { display:none; }
