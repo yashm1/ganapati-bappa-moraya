@@ -17,3 +17,11 @@ test("cluster counts use a native marker label instead of rebuilding an SVG on e
   assert.match(source, /label: \{\s*color: "#fff",[\s\S]*text: String\(count\),/);
   assert.doesNotMatch(source, /createClusterMarkerIcon\(count\)/);
 });
+
+test("co-located pandals are spread before their markers are rendered", async () => {
+  const source = await readFile(new URL("../app/map-experience.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /spreadOverlappingPositions/);
+  assert.match(source, /displayPositions\.get\(pandal\.id\)/);
+  assert.match(source, /position: toMapPosition\(displayCoordinates\)/);
+});

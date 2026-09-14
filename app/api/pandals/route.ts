@@ -78,8 +78,8 @@ export async function POST(request: Request) {
   if (!(await hasValidImageSignature(photo))) {
     return Response.json({ error: "The uploaded file does not contain a valid image" }, { status: 400 });
   }
-  if (!name || !area || !description || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
-    return Response.json({ error: "Name, neighbourhood, description, and location are required" }, { status: 400 });
+  if (!name || !area || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+    return Response.json({ error: "Name, neighbourhood, and location are required" }, { status: 400 });
   }
   if (name.length > 100 || area.length > 100) {
     return Response.json({ error: "Name and neighbourhood must be 100 characters or fewer" }, { status: 400 });
