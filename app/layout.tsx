@@ -20,7 +20,7 @@ export function generateMetadata(): Metadata {
     openGraph: {
       title: "Bappa Map — Pandals of India",
       description: "Discover Ganapati pandals across India with Bappa Map.",
-      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "Bappa Map — Pandals of India" }],
+      images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "Bappa Map — Pandals of India" }],
       type: "website",
     },
     twitter: {
