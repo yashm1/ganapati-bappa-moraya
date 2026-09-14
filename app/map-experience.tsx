@@ -607,7 +607,8 @@ export function MapExperience() {
         <div className="directory-heading">
           <div>
             <span className="eyebrow">{visiblePandals.length} community discoveries</span>
-            <h1>Explore pandals</h1>
+            <h1>Explore pandals in Mumbai</h1>
+            <p className="directory-intro">Find Ganesh Chaturthi pandals, compare crowd levels, and plan your pandal-hopping route.</p>
           </div>
           <button className="close-mobile" type="button" onClick={() => setMobileListOpen(false)} aria-label="Close list">
             <X size={20} />
@@ -693,7 +694,7 @@ export function MapExperience() {
               key={pandal.id}
               onClick={() => focusPandal(pandal)}
             >
-              <img src={pandal.image} alt="" loading="lazy" fetchPriority="low" decoding="async" />
+              <img src={pandal.image} alt={`${pandal.name} pandal in ${pandal.area}`} width={68} height={76} loading="lazy" fetchPriority="low" decoding="async" />
               <span className="item-copy">
                 <strong>{pandal.name}</strong>
                 <small>{pandal.area}</small>
@@ -751,7 +752,7 @@ export function MapExperience() {
             <X size={18} />
           </button>
           <div className="detail-image-wrap">
-            <img src={selected.image} alt={`${selected.name} Ganapati`} />
+            <img src={selected.image} alt={`${selected.name} Ganapati pandal in ${selected.area}`} width={480} height={300} />
             {selected.eco && <span className="eco-badge"><Leaf size={13} /> Eco-friendly</span>}
           </div>
           <div className="detail-content">
