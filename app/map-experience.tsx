@@ -24,6 +24,7 @@ import confetti from "canvas-confetti";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { loadGoogleMaps } from "@/lib/google-maps.mjs";
+import { spreadOverlappingPositions } from "@/lib/map-markers.mjs";
 import { installMapResumeHandler } from "@/lib/map-resume.mjs";
 
 type CrowdLevel = "Low" | "Moderate" | "High";
@@ -269,6 +270,11 @@ export function MapExperience() {
     return filtered;
   }, [crowdFilter, ecoOnly, pandals, query, selectedArea, sortBy]);
 
+  const displayPositions = useMemo(
+    () => spreadOverlappingPositions(visiblePandals),
+    [visiblePandals],
+  );
+
   const hasActiveFilters = useMemo(() => {
     return query.trim() !== "" || ecoOnly || crowdFilter !== "All" || selectedArea !== "All" || sortBy !== "default";
   }, [query, ecoOnly, crowdFilter, selectedArea, sortBy]);
@@ -370,7 +376,7 @@ export function MapExperience() {
       markerClusterRef.current = null;
       markerRefs.current.forEach((marker) => marker.setMap(null));
       const markers = visiblePandals.map((pandal) => {
-        const marker = createGoogleMarker(pandal, maps, compactViewport, (item) => {
+        const marker = createGoogleMarker(pandal, maps, compactViewport, displayPositions.get(pandal.id) ?? pandal.coordinates, (item) => {
           setSelected(item);
           setMobileListOpen(false);
           if (map.setOptions) {
@@ -430,7 +436,7 @@ export function MapExperience() {
     };
 
     syncPandals();
-  }, [compactViewport, mapReady, visiblePandals]);
+  }, [compactViewport, displayPositions, mapReady, visiblePandals]);
 
   const focusPandal = (pandal: Pandal) => {
     setSelected(pandal);
@@ -841,10 +847,9 @@ export function MapExperience() {
               </div>
 
               <label className="form-field">
-                <span>Description</span>
+                <span>Description (optional)</span>
                 <textarea
                   name="description"
-                  required
                   maxLength={320}
                   rows={4}
                   placeholder="Share what makes this pandal special"
@@ -899,6 +904,7 @@ function createGoogleMarker(
   pandal: Pandal,
   maps: GoogleMapsApi,
   compactViewport: boolean,
+  displayCoordinates: [number, number],
   onSelect: (pandal: Pandal) => void,
 ) {
   // Keep photo markers noticeably lighter than cluster badges so they do not
@@ -912,7 +918,7 @@ function createGoogleMarker(
       url: pandal.image,
     },
     optimized: true,
-    position: toMapPosition(pandal.coordinates),
+    position: toMapPosition(displayCoordinates),
     title: pandal.name,
   });
   marker.addListener("click", () => onSelect(pandal));
