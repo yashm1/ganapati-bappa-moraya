@@ -33,7 +33,10 @@ test.after(() => server?.kill());
 
 test("server-renders the Bappa Map product", async () => {
   const response = await render();
+  const verificationResponse = await fetch(`http://127.0.0.1:${port}/googleb556692174bdf043.html`);
   assert.equal(response.status, 200);
+  assert.equal(verificationResponse.status, 200);
+  assert.equal((await verificationResponse.text()).trim(), "google-site-verification: googleb556692174bdf043.html");
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
