@@ -693,7 +693,7 @@ export function MapExperience() {
               key={pandal.id}
               onClick={() => focusPandal(pandal)}
             >
-              <img src={pandal.image} alt="" />
+              <img src={pandal.image} alt="" loading="lazy" fetchPriority="low" decoding="async" />
               <span className="item-copy">
                 <strong>{pandal.name}</strong>
                 <small>{pandal.area}</small>

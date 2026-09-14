@@ -13,20 +13,20 @@ export function generateMetadata(): Metadata {
 
   return {
     metadataBase: new URL(origin),
-    title: "Bappa Map | Community Pandal Guide",
+    title: "Bappa Map | Pandals of India",
     description:
-      "Discover Ganapati pandals, check live crowd levels, and share a pandal near you.",
+      "Discover Ganapati pandals across India, check live crowd levels, and share a pandal near you.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "Bappa Map",
-      description: "A community-powered Ganapati pandal guide",
-      images: [{ url: `${origin}/og.png`, width: 1733, height: 909, alt: "Bappa Map community pandal guide" }],
+      title: "Bappa Map — Pandals of India",
+      description: "Discover Ganapati pandals across India with Bappa Map.",
+      images: [{ url: `${origin}/og.png`, width: 1731, height: 909, alt: "Bappa Map — Pandals of India" }],
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "Bappa Map",
-      description: "A community-powered Ganapati pandal guide",
+      title: "Bappa Map — Pandals of India",
+      description: "Discover Ganapati pandals across India with Bappa Map.",
       images: [`${origin}/og.png`],
     },
   };
@@ -51,6 +51,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://maps.googleapis.com" />
+        <link rel="preconnect" href="https://maps.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://maps.googleapis.com" />
+      </head>
       <body className={geist.variable}>
         {children}
         <Analytics />
