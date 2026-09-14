@@ -30,7 +30,11 @@ import { installMapResumeHandler } from "@/lib/map-resume.mjs";
 type CrowdLevel = "Low" | "Moderate" | "High";
 
 type MapPosition = { lat: number; lng: number };
+type GoogleLatLng = { lat: () => number; lng: () => number };
+type GoogleMapClickEvent = { latLng?: GoogleLatLng };
+type GoogleMapsListener = { remove: () => void };
 type GoogleMapInstance = {
+  addListener: (event: string, handler: (event?: GoogleMapClickEvent) => void) => GoogleMapsListener;
   fitBounds: (bounds: GoogleBounds, padding?: unknown) => void;
   getZoom: () => number | undefined;
   panTo: (position: MapPosition) => void;
@@ -196,6 +200,7 @@ export function MapExperience() {
   const mapsApiRef = useRef<GoogleMapsApi | null>(null);
   const markerRefs = useRef<GoogleMarkerInstance[]>([]);
   const markerClusterRef = useRef<DisposableMarkerClusterer | null>(null);
+  const uploadMarkerRef = useRef<GoogleMarkerInstance | null>(null);
   const [pandals, setPandals] = useState(PANDALS);
   const [mapReady, setMapReady] = useState(false);
   const [selected, setSelected] = useState<Pandal | null>(null);
@@ -209,6 +214,8 @@ export function MapExperience() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [crowdOpen, setCrowdOpen] = useState(false);
   const [uploadLocation, setUploadLocation] = useState<[number, number] | null>(null);
+  const [uploadLocationSource, setUploadLocationSource] = useState<"current" | "map" | null>(null);
+  const [locationPickerActive, setLocationPickerActive] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -358,11 +365,54 @@ export function MapExperience() {
       markerClusterRef.current = null;
       markerRefs.current.forEach((marker) => marker.setMap(null));
       markerRefs.current = [];
+      uploadMarkerRef.current?.setMap(null);
+      uploadMarkerRef.current = null;
       mapRef.current = null;
       mapsApiRef.current = null;
       setMapReady(false);
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !locationPickerActive) return;
+
+    const listener = map.addListener("click", (event) => {
+      const latitude = event?.latLng?.lat();
+      const longitude = event?.latLng?.lng();
+      if (typeof latitude !== "number" || typeof longitude !== "number" || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+      setUploadLocation([longitude, latitude]);
+      setUploadLocationSource("map");
+      setLocationPickerActive(false);
+      setMapNotice("");
+      setUploadOpen(true);
+    });
+
+    return () => listener.remove();
+  }, [locationPickerActive, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const maps = mapsApiRef.current;
+    if (!map || !maps || !mapReady) return;
+
+    uploadMarkerRef.current?.setMap(null);
+    uploadMarkerRef.current = null;
+    if (!uploadLocation) return;
+
+    uploadMarkerRef.current = new maps.Marker({
+      map: map as never,
+      position: toMapPosition(uploadLocation),
+      title: "Selected pandal location",
+      zIndex: 2000,
+    });
+
+    return () => {
+      uploadMarkerRef.current?.setMap(null);
+      uploadMarkerRef.current = null;
+    };
+  }, [mapReady, uploadLocation]);
 
   // --- Sync markers & clusters whenever pandals or viewport change ---
   useEffect(() => {
@@ -491,6 +541,7 @@ export function MapExperience() {
 
   const captureUploadLocation = () => {
     setUploadError(null);
+    setLocationPickerActive(false);
     if (!navigator.geolocation) {
       setUploadError("Location is not available in this browser.");
       return;
@@ -500,12 +551,28 @@ export function MapExperience() {
       ({ coords }) => {
         const coordinates: [number, number] = [coords.longitude, coords.latitude];
         setUploadLocation(coordinates);
+        setUploadLocationSource("current");
         mapRef.current?.panTo(toMapPosition(coordinates));
         mapRef.current?.setZoom(16);
       },
       () => setUploadError("We could not access your location. Allow location access and try again."),
       { enableHighAccuracy: true, timeout: 10_000 },
     );
+  };
+
+  const startLocationPicker = () => {
+    if (!mapRef.current || !mapReady) {
+      setMapNotice("The map is still loading. Try dropping a pin again in a moment.");
+      return;
+    }
+
+    setUploadLocation(null);
+    setUploadLocationSource(null);
+    setSelected(null);
+    setMobileListOpen(false);
+    setUploadOpen(false);
+    setLocationPickerActive(true);
+    setMapNotice("Tap the map to drop the exact pandal location.");
   };
 
   const submitCrowd = async (level: CrowdLevel) => {
@@ -544,6 +611,7 @@ export function MapExperience() {
         setUploadOpen(false);
         setUploadPreview(null);
         setUploadLocation(null);
+        setUploadLocationSource(null);
         setMapNotice("Thanks! Your pandal is waiting for approval before it appears on the map.");
         form.reset();
         return;
@@ -553,6 +621,7 @@ export function MapExperience() {
       setUploadOpen(false);
       setUploadPreview(null);
       setUploadLocation(null);
+      setUploadLocationSource(null);
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         confetti({ particleCount: 35, spread: 45, origin: { y: 0.8 }, colors: ["#f97316", "#db2777", "#0f9f91", "#f7c948"] });
       }
@@ -601,7 +670,7 @@ export function MapExperience() {
           <button className="icon-control" type="button" aria-label="Locate me" onClick={locateUser}>
             <LocateFixed size={19} />
           </button>
-          <button className="primary-action" type="button" onClick={() => { setUploadError(null); setUploadOpen(true); }}>
+          <button className="primary-action" type="button" onClick={() => { setLocationPickerActive(false); setUploadError(null); setUploadOpen(true); }}>
             <Camera size={18} />
             <span>Add pandal</span>
           </button>
@@ -730,7 +799,7 @@ export function MapExperience() {
           <LocateFixed size={18} />
           <span>Near me</span>
         </button>
-        <button className="mobile-map-action mobile-map-action-primary" type="button" onClick={() => { setUploadError(null); setUploadOpen(true); }}>
+        <button className="mobile-map-action mobile-map-action-primary" type="button" onClick={() => { setLocationPickerActive(false); setUploadError(null); setUploadOpen(true); }}>
           <Camera size={18} />
           <span>Add</span>
         </button>
@@ -857,10 +926,16 @@ export function MapExperience() {
                 <small className="field-hint">A short note visitors will see on the pandal card.</small>
               </label>
 
-              <button className={`location-capture ${uploadLocation ? "captured" : ""}`} type="button" onClick={captureUploadLocation}>
-                {uploadLocation ? <Check size={18} /> : <MapPin size={18} />}
-                <span><strong>{uploadLocation ? "Location captured" : "Use my current location"}</strong><small>{uploadLocation ? "The new pin is ready" : "Used only to place this pandal"}</small></span>
-              </button>
+              <div className="location-options">
+                <button className={`location-capture ${uploadLocation ? "captured" : ""}`} type="button" onClick={captureUploadLocation}>
+                  {uploadLocation ? <Check size={18} /> : <LocateFixed size={18} />}
+                  <span><strong>{uploadLocation ? (uploadLocationSource === "map" ? "Pin dropped" : "Location captured") : "Use my current location"}</strong><small>{uploadLocation ? "The new pin is ready" : "Used only to place this pandal"}</small></span>
+                </button>
+                <button className="location-capture" type="button" onClick={startLocationPicker}>
+                  <MapPin size={18} />
+                  <span><strong>Drop a pin on the map</strong><small>Choose the exact pandal location</small></span>
+                </button>
+              </div>
 
               <div className="upload-options">
                 <label className="eco-toggle">
